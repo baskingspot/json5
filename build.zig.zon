@@ -32,6 +32,13 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
+        // The test runner. Lazy: only the root build uses it, and build.zig
+        // returns early for a consumer.
+        .testingx = .{
+            .url = "https://baskingspot.dev/testingx/v0.2.0.tar.gz",
+            .hash = "testingx-0.2.0-ib95-5lNAwA8WZQH6Q6eDm2hgfC3ixFJuhkOrR8gcZAm",
+            .lazy = true,
+        },
         // See `zig fetch --save <url>` for a command-line interface for adding dependencies.
         //.example = .{
         //    // When updating this field to a new URL, be sure to delete the corresponding
@@ -75,6 +82,8 @@
         "build.zig.zon",
         "src",
         "LICENSE",
+        "LICENSE-ZIG",
+        "LICENSE-UNICODE",
         "README.md",
         "THIRD_PARTY.md",
     },

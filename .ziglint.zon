@@ -1,5 +1,15 @@
 .{
-    .paths = .{ "build.zig", "src" },
+    // src/Stringify.zig is adapted from std/json/Stringify.zig and is exempt
+    // from the house rules, like other vendored code. zig fmt still checks it.
+    .paths = .{
+        "build.zig",
+        "src/root.zig",
+        "src/Diagnostics.zig",
+        "src/Parser.zig",
+        "src/identifier.zig",
+        "src/identifier_ranges.zig",
+        "test/corpus.zig",
+    },
     .rules = .{
         .Z024 = .{ .max_length = 100 },
     },

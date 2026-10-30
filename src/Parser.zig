@@ -13,6 +13,7 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const Diagnostics = @import("Diagnostics.zig");
+const identifier = @import("identifier.zig");
 const Span = Diagnostics.Span;
 
 const Array = std.json.Array;
@@ -33,6 +34,7 @@ const name_escape_message = "a name escape is `\\u` and four hexadecimal digits"
 const string_line_message = "a string cannot span lines without a backslash";
 const string_end_message = "the string does not end";
 const surrogate_pair_message = "a high surrogate needs a low surrogate after it";
+const unicode_escape_message = "`\\u` needs four hexadecimal digits";
 
 source: []const u8,
 index: usize = 0,
@@ -120,7 +122,8 @@ fn parseKeyword(self: *Parser, comptime word: []const u8, value: Value) Error!Va
     self.index += word.len;
     if (!self.atEnd()) {
         const next = self.source[self.index];
-        if (next >= 0x80 or isNameByte(next, false)) {
+        const cp: u21 = if (next < 0x80) next else self.sequenceAt(self.index).cp;
+        if (identifier.isPart(cp)) {
             return self.failAt(
                 self.index - word.len,
                 self.index + 1,
@@ -295,7 +298,11 @@ fn appendEscape(self: *Parser, out: *ArrayList(u8)) Error!void {
             const cp = try self.readHex(backslash, 2, "`\\x` needs two hexadecimal digits");
             try self.appendCodepoint(out, cp);
         },
-        'u' => try self.appendCodepoint(out, try self.readUnicodeEscape(backslash)),
+        'u' => {
+            const escape = try self.unicodeEscapeAt(backslash, unicode_escape_message);
+            self.index = backslash + escape.len;
+            try self.appendCodepoint(out, escape.cp);
+        },
         '\n' => {},
         '\r' => if (!self.atEnd() and self.source[self.index] == '\n') {
             self.index += 1;
@@ -316,29 +323,49 @@ fn appendEscape(self: *Parser, out: *ArrayList(u8)) Error!void {
     }
 }
 
-fn readUnicodeEscape(self: *Parser, backslash: usize) Error!u21 {
-    const cp = try self.readHex(backslash, 4, "`\\u` needs four hexadecimal digits");
-    if (cp >= 0xDC00 and cp <= 0xDFFF) {
+/// One `\uXXXX`, or `\uXXXX\uXXXX` when the first half is a high surrogate.
+/// The bytes start at `at`, which is the backslash. The parser does not move.
+const Escape = struct {
+    cp: u21,
+    /// Six bytes for one escape, twelve for a surrogate pair.
+    len: u8,
+};
+
+fn unicodeEscapeAt(
+    self: *Parser,
+    at: usize,
+    comptime message: []const u8,
+) Error!Escape {
+    if (at + 6 > self.source.len or self.source[at] != '\\' or self.source[at + 1] != 'u') {
+        return self.failAt(at, @min(at + 2, self.source.len), message, .{});
+    }
+    const first = hex4(self.source[at + 2 .. at + 6]) orelse {
+        return self.failAt(at, at + 6, message, .{});
+    };
+    if (first >= 0xDC00 and first <= 0xDFFF) {
         return self.failAt(
-            backslash,
-            self.index,
+            at,
+            at + 6,
             "a low surrogate needs a high surrogate before it",
             .{},
         );
     }
-    if (cp < 0xD800 or cp > 0xDBFF) return cp;
-    if (self.index + 6 > self.source.len or
-        self.source[self.index] != '\\' or self.source[self.index + 1] != 'u')
+    if (first < 0xD800 or first > 0xDBFF) return .{ .cp = first, .len = 6 };
+    if (at + 12 > self.source.len or
+        self.source[at + 6] != '\\' or self.source[at + 7] != 'u')
     {
-        return self.failAt(backslash, self.index, surrogate_pair_message, .{});
+        return self.failAt(at, at + 6, surrogate_pair_message, .{});
     }
-    const low_start = self.index;
-    self.index += 2;
-    const low = try self.readHex(backslash, 4, "`\\u` needs four hexadecimal digits");
+    const low = hex4(self.source[at + 8 .. at + 12]) orelse {
+        return self.failAt(at, at + 12, message, .{});
+    };
     if (low < 0xDC00 or low > 0xDFFF) {
-        return self.failAt(low_start, self.index, surrogate_pair_message, .{});
+        return self.failAt(at + 6, at + 12, surrogate_pair_message, .{});
     }
-    return 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
+    return .{
+        .cp = 0x10000 + ((first - 0xD800) << 10) + (low - 0xDC00),
+        .len = 12,
+    };
 }
 
 fn readHex(
@@ -378,20 +405,25 @@ fn parseIdentifier(self: *Parser) Error![]const u8 {
     while (i < self.source.len) {
         const c = self.source[i];
         if (c == '\\') {
-            const cp = try self.identifierEscape(i);
-            if (!isNameCodepoint(cp, first)) {
-                return self.failAt(i, i + 6, "`\\u{X:0>4}` cannot {s} a name", .{
-                    cp,
+            if (i + 1 >= self.source.len or self.source[i + 1] != 'u') {
+                return self.failAt(i, @min(i + 2, self.source.len), name_escape_message, .{});
+            }
+            const escape = try self.unicodeEscapeAt(i, name_escape_message);
+            if (!isName(escape.cp, first)) {
+                return self.failAt(i, i + escape.len, "`\\u{X:0>4}` cannot {s} a name", .{
+                    escape.cp,
                     if (first) "start" else "continue",
                 });
             }
             escaped = true;
-            i += 6;
+            i += escape.len;
         } else if (c < 0x80) {
-            if (!isNameByte(c, first)) break;
+            if (!isName(c, first)) break;
             i += 1;
         } else {
-            i += self.sequenceAt(i).len;
+            const sequence = self.sequenceAt(i);
+            if (!isName(sequence.cp, first)) break;
+            i += sequence.len;
         }
         first = false;
     }
@@ -410,14 +442,9 @@ fn parseIdentifier(self: *Parser) Error![]const u8 {
     return self.decodeIdentifier(start, i);
 }
 
-/// Read one `\uXXXX` in a name and return its code point. The six bytes must
-/// be in the source, because the caller measured them first.
-fn identifierEscape(self: *Parser, at: usize) Error!u21 {
-    if (at + 6 > self.source.len or self.source[at + 1] != 'u') {
-        return self.failAt(at, @min(at + 2, self.source.len), name_escape_message, .{});
-    }
-    if (hex4(self.source[at + 2 .. at + 6])) |cp| return cp;
-    return self.failAt(at, at + 6, name_escape_message, .{});
+/// Can `cp` appear at this point in a name? `first` is true at the start.
+fn isName(cp: u21, first: bool) bool {
+    return if (first) identifier.isStart(cp) else identifier.isPart(cp);
 }
 
 fn decodeIdentifier(self: *Parser, start: usize, end: usize) Error![]const u8 {
@@ -430,14 +457,11 @@ fn decodeIdentifier(self: *Parser, start: usize, end: usize) Error![]const u8 {
             i += 1;
             continue;
         }
-        const cp = hex4(self.source[i + 2 .. i + 6]).?;
-        if (cp >= 0xD800 and cp <= 0xDFFF) {
-            return self.failAt(i, i + 6, "a name cannot hold a surrogate half", .{});
-        }
+        const escape = try self.unicodeEscapeAt(i, name_escape_message);
         var buffer: [4]u8 = undefined;
-        const len = std.unicode.utf8Encode(cp, &buffer) catch unreachable;
+        const len = std.unicode.utf8Encode(escape.cp, &buffer) catch unreachable;
         try out.appendSlice(self.allocator, buffer[0..len]);
-        i += 6;
+        i += escape.len;
     }
     return out.toOwnedSlice(self.allocator);
 }
@@ -449,23 +473,6 @@ fn hex4(bytes: []const u8) ?u21 {
         value = value * 16 + @as(u21, digit);
     }
     return value;
-}
-
-/// The ASCII part of ES5's IdentifierStart and IdentifierPart, plus every
-/// non-ASCII code point. The spec asks for the Unicode letter, combining-mark,
-/// digit, and connector-punctuation categories; this over-accepts instead of
-/// carrying the table. See the module doc in `root.zig`.
-fn isNameCodepoint(cp: u21, first: bool) bool {
-    if (cp < 0x80) return isNameByte(@intCast(cp), first);
-    return !(cp >= 0xD800 and cp <= 0xDFFF);
-}
-
-fn isNameByte(c: u8, first: bool) bool {
-    return switch (c) {
-        'A'...'Z', 'a'...'z', '_', '$' => true,
-        '0'...'9' => !first,
-        else => false,
-    };
 }
 
 // Numbers

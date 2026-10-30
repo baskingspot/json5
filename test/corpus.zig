@@ -60,7 +60,7 @@ test "every .json case matches the std.json tree" {
             },
         };
         var diagnostics: json5.Diagnostics = undefined;
-        const actual = json5.parseFromSliceLeaky(allocator, source, .{
+        const actual = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
@@ -70,6 +70,7 @@ test "every .json case matches the std.json tree" {
                 if (failures == max_failures) break;
                 continue;
             },
+            else => return err,
         };
         if (expected) |tree| {
             expectSame(case.path, "", &tree, actual) catch {
@@ -95,7 +96,7 @@ test "every .json5 case parses and survives the writer" {
         checked += 1;
         const source = try readFile(allocator, case.path);
         var diagnostics: json5.Diagnostics = undefined;
-        const first = json5.parseFromSliceLeaky(allocator, source, .{
+        const first = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
@@ -105,6 +106,7 @@ test "every .json5 case parses and survives the writer" {
                 if (failures == max_failures) break;
                 continue;
             },
+            else => return err,
         };
 
         var output: std.Io.Writer.Allocating = .init(allocator);
@@ -114,7 +116,7 @@ test "every .json5 case parses and survives the writer" {
             if (failures == max_failures) break;
             continue;
         };
-        const second = json5.parseFromSliceLeaky(allocator, output.written(), .{
+        const second = json5.parseFromSliceLeaky(std.json.Value, allocator, output.written(), .{
             .diagnostics = &diagnostics,
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
@@ -126,6 +128,7 @@ test "every .json5 case parses and survives the writer" {
                 if (failures == max_failures) break;
                 continue;
             },
+            else => return err,
         };
         if (!sameValue(first, second)) {
             try report(case.path, "the written value reads back as another tree", .{});
@@ -150,7 +153,7 @@ test "every .js and .txt case is rejected with a diagnostic" {
         checked += 1;
         const source = try readFile(allocator, case.path);
         var diagnostics: json5.Diagnostics = undefined;
-        const result = json5.parseFromSliceLeaky(allocator, source, .{
+        const result = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
         });
         if (result) |_| {
@@ -173,6 +176,7 @@ test "every .js and .txt case is rejected with a diagnostic" {
                     failures += 1;
                 }
             },
+            else => return err,
         }
         if (failures == max_failures) break;
     }
@@ -197,7 +201,8 @@ fn collect(allocator: std.mem.Allocator) ![]Case {
             .json
         else if (std.mem.endsWith(u8, entry.path, ".json5"))
             .json5
-        else if (std.mem.endsWith(u8, entry.path, ".js") or std.mem.endsWith(u8, entry.path, ".txt"))
+        else if (std.mem.endsWith(u8, entry.path, ".js") or
+            std.mem.endsWith(u8, entry.path, ".txt"))
             .rejected
         else
             continue;
