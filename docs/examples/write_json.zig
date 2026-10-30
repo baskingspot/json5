@@ -9,12 +9,19 @@ test "write the tree as strict JSON" {
         \\}
     ;
 
-    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .{});
+    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .init);
     defer document.deinit();
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
-    try json5.Stringify.value(document.value, .{ .whitespace = .indent_2 }, &output.writer);
+    try json5.Stringify.value(document.value, .{
+        .allow_nonfinite = true,
+        .whitespace = .indent_2,
+        .emit_null_optional_fields = true,
+        .emit_strings_as_arrays = false,
+        .escape_unicode = false,
+        .emit_nonportable_numbers_as_strings = false,
+    }, &output.writer);
 
     try std.testing.expectEqualStrings(
         \\{

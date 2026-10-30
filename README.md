@@ -18,7 +18,7 @@ comma, single-quoted and multi-line strings, unquoted names, `0x` numbers, a
 leading `+`, a leading or trailing decimal point, `NaN`, and `Infinity`.
 
 ```zig
-const document = try json5.parseFromSlice(std.json.Value, gpa, source, .{});
+const document = try json5.parseFromSlice(std.json.Value, gpa, source, .init);
 defer document.deinit();
 ```
 

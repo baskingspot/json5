@@ -62,6 +62,7 @@ test "every .json case matches the std.json tree" {
         var diagnostics: json5.Diagnostics = undefined;
         const actual = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
+            .json = .{},
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.SyntaxError => {
@@ -98,6 +99,7 @@ test "every .json5 case parses and survives the writer" {
         var diagnostics: json5.Diagnostics = undefined;
         const first = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
+            .json = .{},
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.SyntaxError => {
@@ -110,7 +112,7 @@ test "every .json5 case parses and survives the writer" {
         };
 
         var output: std.Io.Writer.Allocating = .init(allocator);
-        json5.Stringify.value(first, .{}, &output.writer) catch |err| {
+        json5.Stringify.value(first, .init, &output.writer) catch |err| {
             try report(case.path, "writing it failed: {s}", .{@errorName(err)});
             failures += 1;
             if (failures == max_failures) break;
@@ -118,6 +120,7 @@ test "every .json5 case parses and survives the writer" {
         };
         const second = json5.parseFromSliceLeaky(std.json.Value, allocator, output.written(), .{
             .diagnostics = &diagnostics,
+            .json = .{},
         }) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.SyntaxError => {
@@ -155,6 +158,7 @@ test "every .js and .txt case is rejected with a diagnostic" {
         var diagnostics: json5.Diagnostics = undefined;
         const result = json5.parseFromSliceLeaky(std.json.Value, allocator, source, .{
             .diagnostics = &diagnostics,
+            .json = .{},
         });
         if (result) |_| {
             try report(case.path, "it parsed, and it must not", .{});

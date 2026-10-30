@@ -36,12 +36,12 @@ const surrogate_pair_message = "a high surrogate needs a low surrogate after it"
 const unicode_escape_message = "`\\u` needs four hexadecimal digits";
 
 source: []const u8,
-index: usize = 0,
+index: usize,
 allocator: Allocator,
-diagnostics: ?*Diagnostics = null,
+diagnostics: ?*Diagnostics,
 /// Stands in when the caller passed none, so the failure path has one shape.
-fallback: Diagnostics = .{},
-depth: u32 = 0,
+fallback: Diagnostics,
+depth: u32,
 
 /// A line and a byte column, both counted from one.
 const Position = struct {
@@ -61,8 +61,11 @@ const Sequence = struct {
 pub fn init(allocator: Allocator, source: []const u8, diagnostics: ?*Diagnostics) Parser {
     return .{
         .source = source,
+        .index = 0,
         .allocator = allocator,
         .diagnostics = diagnostics,
+        .fallback = .init,
+        .depth = 0,
     };
 }
 
@@ -71,7 +74,7 @@ pub fn init(allocator: Allocator, source: []const u8, diagnostics: ?*Diagnostics
 pub fn parse(self: *Parser) Error!Value {
     if (self.source.len > math.maxInt(u32)) {
         const diagnostics = self.report();
-        diagnostics.* = .{ .span = .{ .start = 0, .end = 0 } };
+        diagnostics.* = .init;
         diagnostics.setMessage("the source is longer than 4 GiB", .{});
         return error.SyntaxError;
     }
@@ -751,7 +754,8 @@ fn failAt(self: *Parser, start: usize, end: usize, comptime fmt: []const u8, arg
         .end = @intCast(@min(end, self.source.len)),
     };
     const position = positionAt(self.source, span.start);
-    diagnostics.* = .{ .span = span };
+    diagnostics.* = .init;
+    diagnostics.span = span;
     diagnostics.line = position.line;
     diagnostics.column = position.column;
     diagnostics.setMessage(fmt, args);

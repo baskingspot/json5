@@ -18,14 +18,24 @@ pub const Span = struct {
 };
 
 /// The bytes the parser gave up on.
-span: Span = .{ .start = 0, .end = 0 },
+span: Span,
 /// The line of `span.start`, counted from one. Line feeds and carriage
 /// returns each start a line.
-line: u32 = 1,
+line: u32,
 /// The column of `span.start` on that line, counted from one in bytes.
-column: u32 = 1,
-len: u8 = 0,
-buf: [127]u8 = undefined,
+column: u32,
+len: u8,
+buf: [127]u8,
+
+/// The state before a parse writes into it: an empty span at the start of
+/// the source, on line 1, column 1, with no message.
+pub const init: Diagnostics = .{
+    .span = .{ .start = 0, .end = 0 },
+    .line = 1,
+    .column = 1,
+    .len = 0,
+    .buf = undefined,
+};
 
 /// The explanation, for example "a name cannot start with `10`".
 ///
@@ -51,7 +61,7 @@ pub fn setMessage(self: *Diagnostics, comptime fmt: []const u8, args: anytype) v
 }
 
 test "message truncates on a character boundary" {
-    var d: Diagnostics = .{};
+    var d: Diagnostics = .init;
     d.setMessage("é{s}", .{"é" ** 100});
     const text = d.message();
     try testing.expect(text.len < 127);
@@ -59,7 +69,7 @@ test "message truncates on a character boundary" {
 }
 
 test "message keeps short text whole" {
-    var d: Diagnostics = .{};
+    var d: Diagnostics = .init;
     d.setMessage("a name cannot start with `{s}`", .{"1"});
     try testing.expectEqualStrings("a name cannot start with `1`", d.message());
 }

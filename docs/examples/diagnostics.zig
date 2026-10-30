@@ -9,7 +9,7 @@ test "a bad document comes back with its position" {
         std.json.Value,
         std.testing.allocator,
         source,
-        .{ .diagnostics = &diagnostics },
+        .{ .diagnostics = &diagnostics, .json = .{} },
     ));
 
     try std.testing.expectEqual(@as(u32, 3), diagnostics.line);

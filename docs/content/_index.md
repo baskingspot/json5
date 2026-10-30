@@ -128,7 +128,7 @@ pub fn jsonParseFromValue(
 
 is decoded by that method instead.
 
-`parseFromSliceLeaky(T, arena.allocator(), source, .{})` is the same parse
+`parseFromSliceLeaky(T, arena.allocator(), source, .init)` is the same parse
 into an arena the caller owns. The arena must stay at the same address while
 the value lives, because a `std.json.Value` tree's arrays hold the allocator
 built from it.
