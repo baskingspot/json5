@@ -13,7 +13,7 @@ knows, back as strict JSON.
 - [Reading a value](#reading-a-value): `parseFromSlice(std.json.Value, ...)` returns a `Parsed`, and `Diagnostics` gives the span, line, and message of the first syntax error.
 - [Typed reading](#typed-reading): pass a struct, union, enum, or slice as the first argument, and `std.json.parseFromValue` builds it. `ParseOptions.json` holds std's options.
 - [Writing](#writing): `Stringify.value` takes the types `std.json.Stringify.value` takes, and `Options` sets indentation, ASCII escaping, and what happens to `NaN`.
-- [Identifiers](#identifiers): unquoted names follow ES5.1's IdentifierName exactly, from the generated Unicode 18.0.0 tables.
+- [Identifiers](#identifiers): a name is ASCII IdentifierStart and IdentifierPart plus any non-ASCII code point, and a `\uXXXX` escape or a surrogate pair decodes first.
 - [Conformance](#conformance): 114 cases from `json5-tests`, run by `just test`.
 - [Limits](#limits): a parser that wants the whole source and a writer that normalizes the document.
 
@@ -197,22 +197,17 @@ The writer's methods are `beginObject`, `endObject`, `objectField`,
 
 # Identifiers
 
-## The ES5.1 rule
+## The ASCII subset
 
-An unquoted name is an ECMAScript 5.1 IdentifierName. IdentifierStart is `$`,
-`_`, or a character in the Lu, Ll, Lt, Lm, Lo, or Nl category. IdentifierPart
-adds Mn, Mc, Nd, Pc, U+200C, and U+200D.
-
-The tables come from `UnicodeData.txt`, version 18.0.0, through
-`tools/gen_identifiers.py`; `src/identifier_ranges.zig` is the committed
-result. `Ümläüt`, `aδ`, `$x`, and `_` are names. `☃`, `😀`, and a leading
-digit are syntax errors. The categories are ES5.1's, but the check runs on
-decoded code points, so an astral letter such as U+10400 is a name character
-and its UTF-16 surrogate pair is accepted as an escape.
+IdentifierStart is `$`, `_`, or an ASCII letter. IdentifierPart adds the
+digits. Any non-ASCII code point is accepted in either position as well, which
+is wider than ES5.1. `Ümläüt`, `aδ`, `$x`, and `_` are names, and so is `☃`.
+A leading digit is a syntax error. `# Limits` states what the wider rule
+costs.
 
 ## Escapes
 
-A `\uXXXX` in a name is decoded before the category check. A high surrogate
+A `\uXXXX` in a name is decoded before the name rule is applied. A high surrogate
 must be followed by a low surrogate, and the pair decodes to one code point,
 so `\uD801\uDC00` is U+10400 and can start a name. A lone surrogate is a
 syntax error.
@@ -238,4 +233,5 @@ with `error.SyntaxError` and a diagnostic inside the source.
 - The parser wants the whole source in memory. There is no streaming entry point.
 - `Value` has no place for comments or extra whitespace, so the writer emits a normalized document.
 - A map without a `jsonStringify` method is written as a struct of its fields, because that is what `std.json.Stringify` does.
+- The exact ES5.1 identifier categories: a name accepts ASCII plus any non-ASCII code point, and the categories would need a Unicode property table this package does not vendor.
 - Objects and arrays may nest 256 deep. The parser returns `error.SyntaxError` past that, and the writer returns `error.NestingTooDeep`.

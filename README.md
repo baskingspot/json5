@@ -24,7 +24,7 @@ The library is incubating: pin a commit, and expect the API to move.
 - [Reading a value](docs/content/_index.md#reading-a-value): `parseFromSlice` returns a `Parsed`, and `Diagnostics` gives the span, line, column, and message of the first syntax error.
 - [Typed reading](docs/content/_index.md#typed-reading): the first argument is the destination type, `std.json.parseFromValue` builds it, and `ParseOptions.json` carries std's options.
 - [Writing](docs/content/_index.md#writing): `Stringify.value` emits strict JSON for the tree or any type std knows, with indentation, ASCII escaping, and `NaN` handling in `Options`.
-- [Identifiers](docs/content/_index.md#identifiers): unquoted names follow ES5.1's IdentifierName from the generated Unicode 18.0.0 tables, and `\uXXXX` escapes decode before the category check.
+- [Identifiers](docs/content/_index.md#identifiers): a name is ASCII IdentifierStart and IdentifierPart plus any non-ASCII code point, and a `\uXXXX` escape or a surrogate pair decodes first.
 - [Conformance](docs/content/_index.md#conformance): 114 cases from `json5-tests`, run by `just test`. Every `.json` case parses and 25 of the 26 match the `std.json` tree; every `.json5` case parses; every `.js` and `.txt` case is rejected with a diagnostic.
 - [Limits](docs/content/_index.md#limits): a parser that wants the whole source and a writer that normalizes the document.
 
@@ -33,6 +33,7 @@ Not implemented:
 - Streaming: `parseFromSlice` wants the whole document in memory.
 - Comment and whitespace preservation: `Value` has no place for either, so the writer emits a normalized document.
 - A map arm: a map without a `jsonStringify` method is written as a struct of its fields, as in `std.json`.
+- The exact ES5.1 identifier categories: a name accepts ASCII plus any non-ASCII code point, and the categories would need a Unicode property table this package does not vendor.
 
 ## Install
 
@@ -71,9 +72,8 @@ runs what CI runs: the unit tests, the vendored `json5-tests` corpus, and lint.
 
 MIT. See [`LICENSE`](LICENSE). `src/Stringify.zig` is adapted from Zig's
 standard library; [`THIRD_PARTY.md`](THIRD_PARTY.md) lists its terms and
-[`LICENSE-ZIG`](LICENSE-ZIG) reproduces them. `src/identifier_ranges.zig` is
-generated from `UnicodeData.txt`; [`LICENSE-UNICODE`](LICENSE-UNICODE) covers
-it. The conformance corpus is vendored from
+[`LICENSE-ZIG`](LICENSE-ZIG) reproduces them. The conformance corpus is
+vendored from
 [`json5/json5-tests`](https://github.com/json5/json5-tests);
 [`THIRD_PARTY.md`](THIRD_PARTY.md) lists its terms.
 
