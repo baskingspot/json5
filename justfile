@@ -5,7 +5,7 @@
 default:
     @just --list
 
-[doc("Unit tests")]
+[doc("Unit tests: the module and the json5-tests corpus")]
 [group("test")]
 test:
     zig build test --summary all
@@ -14,9 +14,9 @@ test:
 [group("lint")]
 lint:
     ziglint
-    zig fmt --check src build.zig
+    zig fmt --check src test/corpus.zig build.zig build.zig.zon
     nix fmt -- --ci
-    oxfmt --check README.md AGENTS.md .github
+    oxfmt --check README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md .github .oxfmtrc.jsonc
     actionlint
     zizmor .
     just --fmt --check
@@ -24,11 +24,11 @@ lint:
 [doc("Format everything lint checks")]
 [group("lint")]
 fmt:
-    zig fmt src build.zig
+    zig fmt src test/corpus.zig build.zig build.zig.zon
     nix fmt
-    oxfmt README.md AGENTS.md .github
+    oxfmt README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md .github .oxfmtrc.jsonc
     just --fmt
 
-[doc("Everything CI runs")]
+[doc("Everything CI runs: the tests and lint")]
 [group("ci")]
 ci: test lint
