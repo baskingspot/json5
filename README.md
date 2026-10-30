@@ -24,7 +24,8 @@ The library is incubating: pin a commit, and expect the API to move.
 - The value tree: `Value` is `std.json.Value`, so `ObjectMap` and `Array` are the map and list `std.json` builds, and member order is document order. A repeated name keeps its first position and its last value.
 - Writing a value: `Stringify.value` emits strict JSON. `Options.whitespace` indents, `Options.escape_unicode` keeps the output ASCII, and `Options.allow_nonfinite = false` turns `NaN` and `Infinity` into `error.NonFiniteFloat`.
 - Conformance: 114 cases from `json5-tests`, run by `just test`. Every `.json` case parses and 25 of the 26 match the `std.json` tree; every `.json5` case parses; every `.js` and `.txt` case is rejected with a diagnostic.
-  Not implemented:
+
+Not implemented:
 
 - Typed decoding and encoding: `parseFromSlice` returns a `Value` tree. Read fields with `Value.object.get`, and build the tree by hand.
 - Streaming: the parser wants the whole document in memory.
