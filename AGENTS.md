@@ -10,6 +10,10 @@ JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments. It i
 
 Zig 0.16 only. The flake is the tool contract, from `baskingspot/nix`: `nix develop` provides Zig, `ziglint`, and the base tools, and nothing comes from the system PATH. The justfile is the command interface: `just test`, `just lint`, `just ci`. Run `just fmt` before you commit.
 
+The conformance corpus in `test/json5-tests/` is vendored from
+`json5/json5-tests` and must not be edited to make a test pass;
+`THIRD_PARTY.md` records the commit. `just test` runs the corpus.
+
 ## Rules
 
 - Commit messages are one line, `area: summary`, and every commit is signed. Do not rewrite pushed history.
