@@ -14,8 +14,8 @@ It reads the syntax JSON leaves out: `//` and `/* */` comments, a trailing
 comma, single-quoted and multi-line strings, unquoted names, `0x` numbers, a
 leading `+`, a leading or trailing decimal point, `NaN`, and `Infinity`.
 
-- [Reading a value](#reading-a-value): `parseFromSlice(std.json.Value, ...)` returns a `Parsed`, and `Diagnostics` gives the span, line, and message of the first syntax error.
-- [Typed reading](#typed-reading): pass a struct, union, enum, or slice as the first argument, and `std.json.parseFromValue` builds it. `ParseOptions.json` holds std's options.
+- [Reading a value](#reading-a-value): `parseFromSlice(std.json.Value, ...)` returns a `Parsed`, and `Diagnostics` gives the span, line, byte column, and message of the first syntax error.
+- [Typed reading](#typed-reading): the first argument is any type `std.json.parseFromValue` accepts, including `std.json.Value`; `ParseOptions.json` holds std's options for the second pass.
 - [Writing](#writing): `Stringify.value` takes the types `std.json.Stringify.value` takes, and `Options` sets indentation, ASCII escaping, and what happens to `NaN`.
 - [Identifiers](#identifiers): a name is ASCII IdentifierStart and IdentifierPart plus any non-ASCII code point, and a `\uXXXX` escape or a surrogate pair decodes first.
 - [Conformance](#conformance): 114 cases from `json5-tests`, run by `just test`.

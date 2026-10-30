@@ -39,6 +39,7 @@ Not implemented:
 - Comment and whitespace preservation: `Value` has no place for either, so the writer emits a normalized document.
 - A map arm: a map without a `jsonStringify` method is written as a struct of its fields, as in `std.json`.
 - The exact ES5.1 identifier categories: a name accepts ASCII plus any non-ASCII code point, and the categories would need a Unicode property table this package does not vendor.
+- 256-deep nesting: the parser returns `error.SyntaxError` past that, and the writer returns `error.NestingTooDeep`.
 
 ## Install
 
@@ -58,7 +59,7 @@ exe.root_module.addImport("json5", json5.module("json5"));
 ## Documentation
 
 - The [guide](https://baskingspot.dev/json5/) covers reading, typed reading, writing, identifiers, and the corpus.
-- The [API reference](https://baskingspot.dev/json5/api/) documents every public symbol. Every declaration in `src/` carries the doc comment the API entry renders.
+- The [API reference](https://baskingspot.dev/json5/api/) documents every public symbol in `src/root.zig`.
 - [`docs/examples/`](docs/examples/) is the test-verified code shown in the guide: `just test` compiles and runs it alongside the module's own tests.
 - [`AGENTS.md`](AGENTS.md) has the working notes for the repository.
 
