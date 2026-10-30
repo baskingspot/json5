@@ -6,9 +6,13 @@
 //! that tree through `std.json.parseFromValue`. `Stringify` writes either form
 //! as strict JSON.
 //!
-//! An unquoted name is an ECMAScript 5.1 IdentifierName, checked against
-//! tables generated from Unicode 18.0.0. A surrogate-pair escape is decoded
-//! first, so U+10400 and the pair that spells it are the same name character.
+//! Name characters are an approximation: ASCII IdentifierStart and
+//! IdentifierPart, plus any non-ASCII code point. The exact ES5.1 categories
+//! would need a Unicode property table this package does not vendor.
+//!
+//! A `\uXXXX` escape or a surrogate pair decodes before the check, so
+//! `\uD801\uDC00` and U+10400 are the same name character. A lone surrogate
+//! is an error.
 //!
 //! A number is `.integer` when its literal has no fraction and no exponent,
 //! fits `i64`, and is not a negative zero. Every other number is `.float`,
@@ -285,7 +289,7 @@ test "unquoted names" {
     try testing.expectEqual(@as(i64, 6), root.get("while").?.integer);
 }
 
-test "a name follows the Unicode categories" {
+test "a name accepts the ASCII subset and any non-ASCII code point" {
     const source =
         \\{
         \\    Ümläüt: 1,
@@ -309,15 +313,11 @@ test "a name follows the Unicode categories" {
     try testing.expectEqual(@as(i64, 7), root.get("a\u{200C}b").?.integer);
 }
 
-test "a name rejects what ES5 rejects" {
+test "a name rejects a digit and a lone surrogate" {
     const cases = [_][]const u8{
-        "{ ☃: 1 }",
-        "{ 😀: 1 }",
         "{ 1a: 1 }",
         "{ \\uD800: 1 }", // a lone high surrogate
         "{ a\\uDC00: 1 }", // a lone low surrogate
-        "{ \\uD83D\\uDE00: 1 }", // an emoji, as a pair
-        "{ \\u200C: 1 }", // ZWNJ cannot start a name
     };
     for (cases) |source| {
         var diagnostics: Diagnostics = undefined;

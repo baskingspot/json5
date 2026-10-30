@@ -6,8 +6,6 @@
         "src/root.zig",
         "src/Diagnostics.zig",
         "src/Parser.zig",
-        "src/identifier.zig",
-        "src/identifier_ranges.zig",
         "test/corpus.zig",
     },
     .rules = .{

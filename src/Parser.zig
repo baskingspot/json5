@@ -13,7 +13,6 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const Diagnostics = @import("Diagnostics.zig");
-const identifier = @import("identifier.zig");
 const Span = Diagnostics.Span;
 
 const Array = std.json.Array;
@@ -123,7 +122,7 @@ fn parseKeyword(self: *Parser, comptime word: []const u8, value: Value) Error!Va
     if (!self.atEnd()) {
         const next = self.source[self.index];
         const cp: u21 = if (next < 0x80) next else self.sequenceAt(self.index).cp;
-        if (identifier.isPart(cp)) {
+        if (isName(cp, false)) {
             return self.failAt(
                 self.index - word.len,
                 self.index + 1,
@@ -442,9 +441,19 @@ fn parseIdentifier(self: *Parser) Error![]const u8 {
     return self.decodeIdentifier(start, i);
 }
 
-/// Can `cp` appear at this point in a name? `first` is true at the start.
+/// Can `cp` appear at this point in a name? The ASCII part of ES5's
+/// IdentifierStart and IdentifierPart, plus every non-ASCII code point. The
+/// exact categories need a Unicode property table this package does not
+/// vendor; `root.zig` states the limit.
 fn isName(cp: u21, first: bool) bool {
-    return if (first) identifier.isStart(cp) else identifier.isPart(cp);
+    if (cp < 0x80) {
+        return switch (cp) {
+            'A'...'Z', 'a'...'z', '_', '$' => true,
+            '0'...'9' => !first,
+            else => false,
+        };
+    }
+    return !(cp >= 0xD800 and cp <= 0xDFFF);
 }
 
 fn decodeIdentifier(self: *Parser, start: usize, end: usize) Error![]const u8 {

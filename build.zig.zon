@@ -83,7 +83,6 @@
         "src",
         "LICENSE",
         "LICENSE-ZIG",
-        "LICENSE-UNICODE",
         "README.md",
         "THIRD_PARTY.md",
     },
