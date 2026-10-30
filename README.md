@@ -44,7 +44,7 @@ Not implemented:
 ## Install
 
 ```sh
-zig fetch --save git+https://github.com/baskingspot/json5
+zig fetch --save https://baskingspot.dev/json5/v0.1.0.tar.gz
 ```
 
 Add the module in `build.zig`:

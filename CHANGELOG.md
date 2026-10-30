@@ -5,13 +5,25 @@ All notable changes to json5 are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-30
+
 ### Added
 
-- `parseFromSlice` and `parseFromSliceLeaky` take the destination type first: `parseFromSlice(MyStruct, gpa, source, .{})` decodes through `std.json.parseFromValue`, and `ParseOptions.json` carries std's options.
-- `Stringify.value` accepts the types `std.json.Stringify.value` accepts, including tagged unions, enums, optionals, slices, and types with a `jsonStringify` method.
-
-### Changed
-
-- `ParseOptions`, `Diagnostics`, `Stringify.Options`, and `Stringify` now require every field: use `ParseOptions.init` or `Diagnostics.init` for the defaults, spell all of `Stringify.Options` for a custom value, and build a writer with `Stringify.init(writer, options)` instead of a struct literal.
-- The tree form is `parseFromSlice(std.json.Value, gpa, source, .init)`; the call without a type no longer compiles.
-- `Stringify.Options` gains std's `emit_null_optional_fields`, `emit_strings_as_arrays`, and `emit_nonportable_numbers_as_strings`, and keeps `allow_nonfinite`.
+- `parseFromSlice(T, allocator, source, options)` reads a JSON5 document into
+  any type `std.json.parseFromValue` accepts, including `std.json.Value`, which
+  returns the tree with no second pass. `parseFromSliceLeaky` leaves the memory
+  with the caller. A syntax error is `error.SyntaxError`, and
+  `ParseOptions.diagnostics` points at a caller-owned `Diagnostics` with a byte
+  span, a one-based line and column, and a message. `ParseOptions.json` carries
+  `std.json`'s options for the typed pass.
+- `Parsed(T)` owns the arena; `deinit` frees the tree.
+- `Stringify.value` writes the types `std.json.Stringify.value` writes,
+  including structs, tagged unions, enums, optionals, slices, and types with a
+  `jsonStringify` method. `Stringify.Options` sets indentation, ASCII escaping,
+  and whether a non-finite float is written or rejected.
+- Non-finite floats are written as `NaN`, `Infinity`, and `-Infinity`, which
+  JSON5 allows and strict JSON does not. `allow_nonfinite = false` returns
+  `error.NonFiniteFloat` instead.
+- The `json5-tests` corpus runs in `just test`: 114 cases, every `.json` tree
+  compared against `std.json`, every `.json5` document parsed and written back,
+  and every `.js` and `.txt` rejected with a diagnostic.
