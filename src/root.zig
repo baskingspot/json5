@@ -23,6 +23,7 @@ const std = @import("std");
 const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
+const Io = std.Io;
 /// A JSON5 value. It is `std.json.Value`, so the tags, the object map, and
 /// the array are the ones in `std.json`.
 pub const Value = std.json.Value;
@@ -143,7 +144,7 @@ test "parse a small document" {
         \\    nothing: null,
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
 
     const root = parsed.value.object;
@@ -159,7 +160,7 @@ test "a syntax error fills the diagnostics the caller passed" {
     var diagnostics: Diagnostics = undefined;
     try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.json.Value, testing.allocator, "{\n  a: 1,\n  b: ,\n}\n", .{
+        parseFromSlice(Value, testing.allocator, "{\n  a: 1,\n  b: ,\n}\n", .{
             .diagnostics = &diagnostics,
         }),
     );
@@ -172,7 +173,7 @@ test "a syntax error fills the diagnostics the caller passed" {
 
 test "a successful parse leaves the diagnostics alone" {
     var diagnostics: Diagnostics = .{ .line = 99, .column = 7 };
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "1", .{
+    var parsed = try parseFromSlice(Value, testing.allocator, "1", .{
         .diagnostics = &diagnostics,
     });
     defer parsed.deinit();
@@ -181,7 +182,7 @@ test "a successful parse leaves the diagnostics alone" {
 }
 
 test "a repeated name keeps the last value" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "{ a: 1, a: 2, b: 3 }", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "{ a: 1, a: 2, b: 3 }", .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 2), root.get("a").?.integer);
@@ -189,7 +190,7 @@ test "a repeated name keeps the last value" {
 }
 
 test "a parsed array can grow in its arena" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "[1]", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "[1]", .{});
     defer parsed.deinit();
     // Appending goes back through the arena the tree was built with, and
     // `Parsed.deinit` frees what it allocates.
@@ -211,7 +212,7 @@ test "the tree does not borrow the source" {
 test "parseFromSliceLeaky writes into the caller's allocator" {
     var arena: ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
-    const value = try parseFromSliceLeaky(std.json.Value, arena.allocator(), "[1, 2, 3]", .{});
+    const value = try parseFromSliceLeaky(Value, arena.allocator(), "[1, 2, 3]", .{});
     try testing.expectEqual(@as(usize, 3), value.array.items.len);
     try testing.expectEqual(@as(i64, 3), value.array.items[2].integer);
 }
@@ -227,7 +228,7 @@ test "string escapes" {
         \\    pair: "\uD83C\uDFBC",
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqualStrings("hello", root.get("plain").?.string);
@@ -249,7 +250,7 @@ test "a string continues on the next line" {
         \\b',
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqualStrings("line 1 line 2", root.get("lf").?.string);
@@ -261,7 +262,7 @@ test "a string may hold a raw carriage return only in a continuation" {
     var diagnostics: Diagnostics = undefined;
     try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.json.Value, testing.allocator, "a: \"line 1 \rline 2\"", .{
+        parseFromSlice(Value, testing.allocator, "a: \"line 1 \rline 2\"", .{
             .diagnostics = &diagnostics,
         }),
     );
@@ -278,7 +279,7 @@ test "unquoted names" {
         \\    while: 6,
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 1), root.get("$").?.integer);
@@ -301,7 +302,7 @@ test "a name accepts the ASCII subset and any non-ASCII code point" {
         \\    a\u200Cb: 7,
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 1), root.get("Ümläüt").?.integer);
@@ -322,7 +323,7 @@ test "a name rejects a digit and a lone surrogate" {
     for (cases) |source| {
         var diagnostics: Diagnostics = undefined;
         try testing.expectError(error.SyntaxError, parseFromSlice(
-            std.json.Value,
+            Value,
             testing.allocator,
             source,
             .{ .diagnostics = &diagnostics },
@@ -348,7 +349,7 @@ test "number mapping" {
         \\    l: 99999999999999999999,
         \\}
     ;
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 15), root.get("a").?.integer);
@@ -370,7 +371,7 @@ test "number mapping" {
 
 test "the number edges" {
     const source = "{ a: +NaN, b: -0x8000000000000000, c: -0xFFFFFFFFFFFFFFFF, d: -0x0 }";
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expect(std.math.isNan(root.get("a").?.float));
@@ -380,7 +381,7 @@ test "the number edges" {
 }
 
 test "a line continuation accepts U+2028" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "'one \\\u{2028}two'", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "'one \\\u{2028}two'", .{});
     defer parsed.deinit();
     try testing.expectEqualStrings("one two", parsed.value.string);
 }
@@ -389,7 +390,7 @@ test "the source must be UTF-8" {
     inline for (.{ "\xFF", "\"\xFF\"" }) |source| {
         try testing.expectError(
             error.SyntaxError,
-            parseFromSlice(std.json.Value, testing.allocator, source, .{}),
+            parseFromSlice(Value, testing.allocator, source, .{}),
         );
     }
 }
@@ -398,7 +399,7 @@ test "comments and extra whitespace" {
     const source =
         "\xEF\xBB\xBF{\u{00A0}/* a block comment */ a: 1, // a line comment\n" ++
         "\u{2028}b: 2\u{2029}\x0C}\u{FEFF}";
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 1), root.get("a").?.integer);
@@ -406,7 +407,7 @@ test "comments and extra whitespace" {
 }
 
 test "a block comment does not nest" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "true /*/* /*/", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "true /*/* /*/", .{});
     defer parsed.deinit();
     try testing.expectEqual(Value{ .bool = true }, parsed.value);
 }
@@ -444,7 +445,7 @@ test "the sources that must fail" {
     };
     for (cases) |source| {
         var diagnostics: Diagnostics = undefined;
-        const result = parseFromSlice(std.json.Value, testing.allocator, source, .{
+        const result = parseFromSlice(Value, testing.allocator, source, .{
             .diagnostics = &diagnostics,
         });
         try testing.expectError(error.SyntaxError, result);
@@ -460,7 +461,7 @@ test "an unpaired surrogate is a string error" {
     var diagnostics: Diagnostics = undefined;
     try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.json.Value, testing.allocator, "\"\\uD800x\"", .{
+        parseFromSlice(Value, testing.allocator, "\"\\uD800x\"", .{
             .diagnostics = &diagnostics,
         }),
     );
@@ -473,16 +474,16 @@ test "a value nested past the limit is a diagnostic" {
     @memset(source[257..], ']');
     try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.json.Value, testing.allocator, source[0..514], .{}),
+        parseFromSlice(Value, testing.allocator, source[0..514], .{}),
     );
 }
 
 test "the writer emits minified JSON" {
     const source = "{ a: 1, b: [true, null, 'x'], c: 1.5 }";
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{}, &output.writer);
     try testing.expectEqualStrings("{\"a\":1,\"b\":[true,null,\"x\"],\"c\":1.5}", output.written());
@@ -490,10 +491,10 @@ test "the writer emits minified JSON" {
 
 test "the writer indents" {
     const source = "{ a: 1, b: [true, null] }";
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{ .whitespace = .indent_2 }, &output.writer);
     try testing.expectEqualStrings(
@@ -508,10 +509,10 @@ test "the writer indents" {
 }
 
 test "the writer escapes non-ASCII on request" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "'é'", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "'é'", .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{ .escape_unicode = true }, &output.writer);
     try testing.expectEqualStrings("\"\\u00e9\"", output.written());
@@ -519,10 +520,10 @@ test "the writer escapes non-ASCII on request" {
 
 test "the writer spells a non-finite float as JSON5" {
     inline for (.{ "NaN", "Infinity", "-Infinity" }) |source| {
-        var parsed = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+        var parsed = try parseFromSlice(Value, testing.allocator, source, .{});
         defer parsed.deinit();
 
-        var output: std.Io.Writer.Allocating = .init(testing.allocator);
+        var output: Io.Writer.Allocating = .init(testing.allocator);
         defer output.deinit();
         try Stringify.value(parsed.value, .{}, &output.writer);
         try testing.expectEqualStrings(source, output.written());
@@ -535,23 +536,23 @@ test "the writer spells a non-finite float as JSON5" {
 }
 
 test "the writer keeps an integral float a float" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "1.0", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "1.0", .{});
     defer parsed.deinit();
     try testing.expect(parsed.value == .float);
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{}, &output.writer);
     try testing.expectEqualStrings("1.0", output.written());
 
-    var again = try parseFromSlice(std.json.Value, testing.allocator, output.written(), .{});
+    var again = try parseFromSlice(Value, testing.allocator, output.written(), .{});
     defer again.deinit();
     try testing.expect(again.value == .float);
 }
 
 test "the writer copies number_string bytes" {
     const value: Value = .{ .number_string = "1e999" };
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(value, .{}, &output.writer);
     try testing.expectEqualStrings("1e999", output.written());
@@ -566,7 +567,7 @@ test "the writer stops on a tree that nests too deep" {
         try array.append(value);
         value = .{ .array = array };
     }
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try testing.expectError(
         error.NestingTooDeep,
@@ -588,14 +589,14 @@ test "a document round-trips through the writer" {
         \\    "backwardsCompatible": "with JSON",
         \\}
     ;
-    var first = try parseFromSlice(std.json.Value, testing.allocator, source, .{});
+    var first = try parseFromSlice(Value, testing.allocator, source, .{});
     defer first.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(first.value, .{ .whitespace = .indent_2 }, &output.writer);
 
-    var second = try parseFromSlice(std.json.Value, testing.allocator, output.written(), .{});
+    var second = try parseFromSlice(Value, testing.allocator, output.written(), .{});
     defer second.deinit();
     try testing.expect(sameValue(first.value, second.value));
 }
@@ -617,7 +618,7 @@ const Release = struct {
 
     pub fn jsonParseFromValue(
         _: Allocator,
-        source: std.json.Value,
+        source: Value,
         _: std.json.ParseOptions,
     ) !Release {
         if (source != .string) return error.UnexpectedToken;
@@ -660,7 +661,7 @@ test "a typed value round-trips" {
     try testing.expectEqualStrings("b", first.value.tags[1]);
     try testing.expectEqual(Release{ .major = 0, .minor = 2 }, first.value.version);
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(first.value, .{}, &output.writer);
 
@@ -679,7 +680,7 @@ test "a NaN in a struct follows allow_nonfinite" {
     defer parsed.deinit();
     try testing.expect(std.math.isNan(parsed.value.value));
 
-    var output: std.Io.Writer.Allocating = .init(testing.allocator);
+    var output: Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{}, &output.writer);
     try testing.expectEqualStrings("{\"value\":NaN,\"label\":\"x\"}", output.written());
@@ -703,7 +704,7 @@ test "the typed pass reads options.json" {
 }
 
 test "the tree type skips the typed pass" {
-    var parsed = try parseFromSlice(std.json.Value, testing.allocator, "{ a: [1, 2] }", .{});
+    var parsed = try parseFromSlice(Value, testing.allocator, "{ a: [1, 2] }", .{});
     defer parsed.deinit();
     try testing.expect(parsed.value == .object);
     const items = parsed.value.object.get("a").?.array.items;

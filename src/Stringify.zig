@@ -28,8 +28,10 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const BitStack = std.BitStack;
 const mem = std.mem;
+const testing = std.testing;
+const Io = std.Io;
 const Stringify = @This();
-const Writer = std.Io.Writer;
+const Writer = Io.Writer;
 
 /// How deep containers may nest. A deeper value is `error.NestingTooDeep`.
 const max_depth: u32 = 256;
@@ -268,7 +270,7 @@ test print {
         \\  ]
         \\}
     ;
-    try std.testing.expectEqualStrings(expected, out.buffered());
+    try testing.expectEqualStrings(expected, out.buffered());
 }
 
 /// An alternative to calling `write` that allows you to write directly to the `.writer` field, e.g. with `.writer.writeAll()`.
@@ -622,13 +624,13 @@ pub fn value(v: anytype, options: Options, writer: *Writer) Error!void {
 }
 
 test value {
-    var out: Writer.Allocating = .init(std.testing.allocator);
+    var out: Writer.Allocating = .init(testing.allocator);
     const writer = &out.writer;
     defer out.deinit();
 
     const T = struct { a: i32, b: []const u8 };
     try value(T{ .a = 123, .b = "xy" }, .{}, writer);
-    try std.testing.expectEqualSlices(u8, "{\"a\":123,\"b\":\"xy\"}", out.written());
+    try testing.expectEqualSlices(u8, "{\"a\":123,\"b\":\"xy\"}", out.written());
 
     try testStringify("9999999999999999", 9999999999999999, .{});
     try testStringify("\"9999999999999999\"", 9999999999999999, .{ .emit_nonportable_numbers_as_strings = true });
@@ -669,14 +671,14 @@ pub fn valueAlloc(gpa: Allocator, v: anytype, options: Options) error{OutOfMemor
 }
 
 test valueAlloc {
-    const allocator = std.testing.allocator;
+    const allocator = testing.allocator;
     const expected =
         \\{"foo":"bar","answer":42,"my_friend":"sammy"}
     ;
     const actual = try valueAlloc(allocator, .{ .foo = "bar", .answer = 42, .my_friend = "sammy" }, .{});
     defer allocator.free(actual);
 
-    try std.testing.expectEqualStrings(expected, actual);
+    try testing.expectEqualStrings(expected, actual);
 }
 
 fn outputUnicodeEscape(codepoint: u21, w: *Writer) Error!void {
@@ -774,7 +776,7 @@ fn testBasicWriteStream(w: *Stringify) !void {
     try w.beginObject();
 
     try w.objectField("object");
-    var arena_allocator = std.heap.ArenaAllocator.init(std.testing.allocator);
+    var arena_allocator = std.heap.ArenaAllocator.init(testing.allocator);
     defer arena_allocator.deinit();
     try w.write(try getJsonObject(arena_allocator.allocator()));
 
@@ -812,10 +814,10 @@ fn testBasicWriteStream(w: *Stringify) !void {
         \\  "float": 3.5
         \\}
     ;
-    try std.testing.expectEqualStrings(expected, w.writer.buffered());
+    try testing.expectEqualStrings(expected, w.writer.buffered());
 }
 
-fn getJsonObject(allocator: std.mem.Allocator) !std.json.Value {
+fn getJsonObject(allocator: Allocator) !std.json.Value {
     var v: std.json.Value = .{ .object = .empty };
     try v.object.put(allocator, "one", std.json.Value{ .integer = @as(i64, @intCast(1)) });
     try v.object.put(allocator, "two", std.json.Value{ .float = 2.0 });
@@ -1017,7 +1019,7 @@ fn testStringify(expected: []const u8, v: anytype, options: Options) !void {
     var buffer: [4096]u8 = undefined;
     var w: Writer = .fixed(&buffer);
     try value(v, options, &w);
-    try std.testing.expectEqualStrings(expected, w.buffered());
+    try testing.expectEqualStrings(expected, w.buffered());
 }
 
 test "raw streaming" {
@@ -1041,5 +1043,5 @@ test "raw streaming" {
         \\  "long key": "long value"
         \\}
     ;
-    try std.testing.expectEqualStrings(expected, w.writer.buffered());
+    try testing.expectEqualStrings(expected, w.writer.buffered());
 }
