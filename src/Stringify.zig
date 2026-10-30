@@ -75,7 +75,12 @@ fn writeArray(items: []const Value, options: Options, writer: *Writer, depth: u3
     try writer.writeByte(']');
 }
 
-fn writeObject(object: std.json.ObjectMap, options: Options, writer: *Writer, depth: u32) Error!void {
+fn writeObject(
+    object: std.json.ObjectMap,
+    options: Options,
+    writer: *Writer,
+    depth: u32,
+) Error!void {
     if (object.count() == 0) {
         try writer.writeAll("{}");
         return;
@@ -96,7 +101,8 @@ fn writeObject(object: std.json.ObjectMap, options: Options, writer: *Writer, de
 }
 
 fn writeString(text: []const u8, options: Options, writer: *Writer) Error!void {
-    try std.json.Stringify.encodeJsonString(text, .{ .escape_unicode = options.escape_unicode }, writer);
+    const encoder: std.json.Stringify.Options = .{ .escape_unicode = options.escape_unicode };
+    try std.json.Stringify.encodeJsonString(text, encoder, writer);
 }
 
 fn writeFloat(number: f64, options: Options, writer: *Writer) Error!void {

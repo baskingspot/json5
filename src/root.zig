@@ -16,9 +16,9 @@
 //! produced.
 
 const std = @import("std");
+const testing = std.testing;
 const Allocator = std.mem.Allocator;
 const ArenaAllocator = std.heap.ArenaAllocator;
-
 /// A JSON5 value. It is `std.json.Value`, so the tags, the object map, and
 /// the array are the ones in `std.json`.
 pub const Value = std.json.Value;
@@ -33,11 +33,9 @@ pub const ObjectMap = std.json.ObjectMap;
 pub const Diagnostics = @import("Diagnostics.zig");
 /// Byte offsets into the source: the first offending byte and one past the last.
 pub const Span = Diagnostics.Span;
-
+const Parser = @import("Parser.zig");
 /// Writes a `std.json.Value` as strict JSON. See `Stringify.Options`.
 pub const Stringify = @import("Stringify.zig");
-
-const Parser = @import("Parser.zig");
 
 /// What a parse can return: the allocator failed, or the source breaks the
 /// grammar. On `error.SyntaxError`, the `Diagnostics` the caller passed says
@@ -113,67 +111,67 @@ test "parse a small document" {
         \\    nothing: null,
         \\}
     ;
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
 
     const root = parsed.value.object;
-    try std.testing.expectEqualStrings("json5", root.get("name").?.string);
-    try std.testing.expectEqual(@as(f64, 1.5), root.get("version").?.float);
-    try std.testing.expectEqual(@as(i64, 16), root.get("hex").?.integer);
-    try std.testing.expectEqual(@as(usize, 2), root.get("tags").?.array.items.len);
-    try std.testing.expectEqualStrings("write", root.get("tags").?.array.items[1].string);
-    try std.testing.expectEqual(Value.null, root.get("nothing").?);
+    try testing.expectEqualStrings("json5", root.get("name").?.string);
+    try testing.expectEqual(@as(f64, 1.5), root.get("version").?.float);
+    try testing.expectEqual(@as(i64, 16), root.get("hex").?.integer);
+    try testing.expectEqual(@as(usize, 2), root.get("tags").?.array.items.len);
+    try testing.expectEqualStrings("write", root.get("tags").?.array.items[1].string);
+    try testing.expectEqual(Value.null, root.get("nothing").?);
 }
 
 test "a syntax error fills the diagnostics the caller passed" {
     var diagnostics: Diagnostics = undefined;
-    try std.testing.expectError(
+    try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.testing.allocator, "{\n  a: 1,\n  b: ,\n}\n", .{
+        parseFromSlice(testing.allocator, "{\n  a: 1,\n  b: ,\n}\n", .{
             .diagnostics = &diagnostics,
         }),
     );
-    try std.testing.expectEqual(@as(u32, 3), diagnostics.line);
-    try std.testing.expectEqual(@as(u32, 6), diagnostics.column);
-    try std.testing.expectEqual(@as(u32, 15), diagnostics.span.start);
-    try std.testing.expectEqual(@as(u32, 16), diagnostics.span.end);
-    try std.testing.expectEqualStrings("expected a value", diagnostics.message());
+    try testing.expectEqual(@as(u32, 3), diagnostics.line);
+    try testing.expectEqual(@as(u32, 6), diagnostics.column);
+    try testing.expectEqual(@as(u32, 15), diagnostics.span.start);
+    try testing.expectEqual(@as(u32, 16), diagnostics.span.end);
+    try testing.expectEqualStrings("expected a value", diagnostics.message());
 }
 
 test "a successful parse leaves the diagnostics alone" {
     var diagnostics: Diagnostics = .{ .line = 99, .column = 7 };
-    var parsed = try parseFromSlice(std.testing.allocator, "1", .{
+    var parsed = try parseFromSlice(testing.allocator, "1", .{
         .diagnostics = &diagnostics,
     });
     defer parsed.deinit();
-    try std.testing.expectEqual(@as(u32, 99), diagnostics.line);
-    try std.testing.expectEqual(@as(u32, 7), diagnostics.column);
+    try testing.expectEqual(@as(u32, 99), diagnostics.line);
+    try testing.expectEqual(@as(u32, 7), diagnostics.column);
 }
 
 test "a repeated name keeps the last value" {
-    var parsed = try parseFromSlice(std.testing.allocator, "{ a: 1, a: 2, b: 3 }", .{});
+    var parsed = try parseFromSlice(testing.allocator, "{ a: 1, a: 2, b: 3 }", .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqual(@as(i64, 2), root.get("a").?.integer);
-    try std.testing.expectEqual(@as(usize, 2), root.count());
+    try testing.expectEqual(@as(i64, 2), root.get("a").?.integer);
+    try testing.expectEqual(@as(usize, 2), root.count());
 }
 
 test "the tree does not borrow the source" {
-    const allocator = std.testing.allocator;
+    const allocator = testing.allocator;
     const source = try allocator.dupe(u8, "{ key: 'value' }");
     var parsed = try parseFromSlice(allocator, source, .{});
     allocator.free(source);
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqualStrings("value", root.get("key").?.string);
+    try testing.expectEqualStrings("value", root.get("key").?.string);
 }
 
 test "parseFromSliceLeaky writes into the caller's allocator" {
-    var arena: ArenaAllocator = .init(std.testing.allocator);
+    var arena: ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
     const value = try parseFromSliceLeaky(arena.allocator(), "[1, 2, 3]", .{});
-    try std.testing.expectEqual(@as(usize, 3), value.array.items.len);
-    try std.testing.expectEqual(@as(i64, 3), value.array.items[2].integer);
+    try testing.expectEqual(@as(usize, 3), value.array.items.len);
+    try testing.expectEqual(@as(i64, 3), value.array.items[2].integer);
 }
 
 test "string escapes" {
@@ -187,15 +185,15 @@ test "string escapes" {
         \\    pair: "\uD83C\uDFBC",
         \\}
     ;
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqualStrings("hello", root.get("plain").?.string);
-    try std.testing.expectEqualStrings("A\u{f8}", root.get("hex").?.string);
-    try std.testing.expectEqualStrings("\x08\x0c\n\r\t\x0b\x00", root.get("special").?.string);
-    try std.testing.expectEqualStrings("\\\"'/", root.get("escaped").?.string);
-    try std.testing.expectEqualStrings("aqb", root.get("unknown").?.string);
-    try std.testing.expectEqualStrings("\u{1F3BC}", root.get("pair").?.string);
+    try testing.expectEqualStrings("hello", root.get("plain").?.string);
+    try testing.expectEqualStrings("A\u{f8}", root.get("hex").?.string);
+    try testing.expectEqualStrings("\x08\x0c\n\r\t\x0b\x00", root.get("special").?.string);
+    try testing.expectEqualStrings("\\\"'/", root.get("escaped").?.string);
+    try testing.expectEqualStrings("aqb", root.get("unknown").?.string);
+    try testing.expectEqualStrings("\u{1F3BC}", root.get("pair").?.string);
 }
 
 test "a string continues on the next line" {
@@ -209,19 +207,19 @@ test "a string continues on the next line" {
         \\b',
         \\}
     ;
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqualStrings("line 1 line 2", root.get("lf").?.string);
-    try std.testing.expectEqualStrings("line 1 line 2", root.get("crlf").?.string);
-    try std.testing.expectEqualStrings("ab", root.get("cr").?.string);
+    try testing.expectEqualStrings("line 1 line 2", root.get("lf").?.string);
+    try testing.expectEqualStrings("line 1 line 2", root.get("crlf").?.string);
+    try testing.expectEqualStrings("ab", root.get("cr").?.string);
 }
 
 test "a string may hold a raw carriage return only in a continuation" {
     var diagnostics: Diagnostics = undefined;
-    try std.testing.expectError(
+    try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.testing.allocator, "a: \"line 1 \rline 2\"", .{
+        parseFromSlice(testing.allocator, "a: \"line 1 \rline 2\"", .{
             .diagnostics = &diagnostics,
         }),
     );
@@ -238,15 +236,15 @@ test "unquoted names" {
         \\    while: 6,
         \\}
     ;
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqual(@as(i64, 1), root.get("$").?.integer);
-    try std.testing.expectEqual(@as(i64, 2), root.get("_").?.integer);
-    try std.testing.expectEqual(@as(i64, 3), root.get("one1").?.integer);
-    try std.testing.expectEqual(@as(i64, 4), root.get("ümläüt").?.integer);
-    try std.testing.expectEqual(@as(i64, 5), root.get("sig\u{3A3}ma").?.integer);
-    try std.testing.expectEqual(@as(i64, 6), root.get("while").?.integer);
+    try testing.expectEqual(@as(i64, 1), root.get("$").?.integer);
+    try testing.expectEqual(@as(i64, 2), root.get("_").?.integer);
+    try testing.expectEqual(@as(i64, 3), root.get("one1").?.integer);
+    try testing.expectEqual(@as(i64, 4), root.get("ümläüt").?.integer);
+    try testing.expectEqual(@as(i64, 5), root.get("sig\u{3A3}ma").?.integer);
+    try testing.expectEqual(@as(i64, 6), root.get("while").?.integer);
 }
 
 test "number mapping" {
@@ -266,48 +264,48 @@ test "number mapping" {
         \\    l: 99999999999999999999,
         \\}
     ;
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqual(@as(i64, 15), root.get("a").?.integer);
-    try std.testing.expectEqual(@as(i64, 16), root.get("b").?.integer);
-    try std.testing.expectEqual(@as(f64, 0.5), root.get("c").?.float);
-    try std.testing.expectEqual(@as(f64, 5.0), root.get("d").?.float);
-    try std.testing.expectEqual(@as(i64, 2), root.get("e").?.integer);
-    try std.testing.expectEqual(@as(f64, 0.0), root.get("f").?.float);
-    try std.testing.expect(std.math.signbit(root.get("f").?.float));
-    try std.testing.expectEqual(@as(f64, 2e23), root.get("g").?.float);
-    try std.testing.expectEqual(@as(f64, 18446744073709551616.0), root.get("h").?.float);
-    try std.testing.expect(std.math.isInf(root.get("i").?.float));
-    try std.testing.expect(std.math.isInf(root.get("j").?.float));
-    try std.testing.expect(root.get("j").?.float < 0);
-    try std.testing.expect(std.math.isNan(root.get("k").?.float));
+    try testing.expectEqual(@as(i64, 15), root.get("a").?.integer);
+    try testing.expectEqual(@as(i64, 16), root.get("b").?.integer);
+    try testing.expectEqual(@as(f64, 0.5), root.get("c").?.float);
+    try testing.expectEqual(@as(f64, 5.0), root.get("d").?.float);
+    try testing.expectEqual(@as(i64, 2), root.get("e").?.integer);
+    try testing.expectEqual(@as(f64, 0.0), root.get("f").?.float);
+    try testing.expect(std.math.signbit(root.get("f").?.float));
+    try testing.expectEqual(@as(f64, 2e23), root.get("g").?.float);
+    try testing.expectEqual(@as(f64, 18446744073709551616.0), root.get("h").?.float);
+    try testing.expect(std.math.isInf(root.get("i").?.float));
+    try testing.expect(std.math.isInf(root.get("j").?.float));
+    try testing.expect(root.get("j").?.float < 0);
+    try testing.expect(std.math.isNan(root.get("k").?.float));
     // A number too large for i64 is a float, never `.number_string`.
-    try std.testing.expectEqual(@as(f64, 1e20), root.get("l").?.float);
+    try testing.expectEqual(@as(f64, 1e20), root.get("l").?.float);
 }
 
 test "the number edges" {
     const source = "{ a: +NaN, b: -0x8000000000000000, c: -0xFFFFFFFFFFFFFFFF, d: -0x0 }";
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expect(std.math.isNan(root.get("a").?.float));
-    try std.testing.expectEqual(std.math.minInt(i64), root.get("b").?.integer);
-    try std.testing.expect(root.get("c").?.float < 0);
-    try std.testing.expect(std.math.signbit(root.get("d").?.float));
+    try testing.expect(std.math.isNan(root.get("a").?.float));
+    try testing.expectEqual(std.math.minInt(i64), root.get("b").?.integer);
+    try testing.expect(root.get("c").?.float < 0);
+    try testing.expect(std.math.signbit(root.get("d").?.float));
 }
 
 test "a line continuation accepts U+2028" {
-    var parsed = try parseFromSlice(std.testing.allocator, "'one \\\u{2028}two'", .{});
+    var parsed = try parseFromSlice(testing.allocator, "'one \\\u{2028}two'", .{});
     defer parsed.deinit();
-    try std.testing.expectEqualStrings("one two", parsed.value.string);
+    try testing.expectEqualStrings("one two", parsed.value.string);
 }
 
 test "the source must be UTF-8" {
     inline for (.{ "\xFF", "\"\xFF\"" }) |source| {
-        try std.testing.expectError(
+        try testing.expectError(
             error.SyntaxError,
-            parseFromSlice(std.testing.allocator, source, .{}),
+            parseFromSlice(testing.allocator, source, .{}),
         );
     }
 }
@@ -316,17 +314,17 @@ test "comments and extra whitespace" {
     const source =
         "\xEF\xBB\xBF{\u{00A0}/* a block comment */ a: 1, // a line comment\n" ++
         "\u{2028}b: 2\u{2029}\x0C}\u{FEFF}";
-    var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
     const root = parsed.value.object;
-    try std.testing.expectEqual(@as(i64, 1), root.get("a").?.integer);
-    try std.testing.expectEqual(@as(i64, 2), root.get("b").?.integer);
+    try testing.expectEqual(@as(i64, 1), root.get("a").?.integer);
+    try testing.expectEqual(@as(i64, 2), root.get("b").?.integer);
 }
 
 test "a block comment does not nest" {
-    var parsed = try parseFromSlice(std.testing.allocator, "true /*/* /*/", .{});
+    var parsed = try parseFromSlice(testing.allocator, "true /*/* /*/", .{});
     defer parsed.deinit();
-    try std.testing.expectEqual(Value{ .bool = true }, parsed.value);
+    try testing.expectEqual(Value{ .bool = true }, parsed.value);
 }
 
 test "the sources that must fail" {
@@ -362,57 +360,58 @@ test "the sources that must fail" {
     };
     for (cases) |source| {
         var diagnostics: Diagnostics = undefined;
-        const result = parseFromSlice(std.testing.allocator, source, .{
+        const result = parseFromSlice(testing.allocator, source, .{
             .diagnostics = &diagnostics,
         });
-        try std.testing.expectError(error.SyntaxError, result);
-        try std.testing.expect(diagnostics.message().len != 0);
-        try std.testing.expect(diagnostics.line >= 1);
-        try std.testing.expect(diagnostics.column >= 1);
-        try std.testing.expect(diagnostics.span.start <= diagnostics.span.end);
-        try std.testing.expect(diagnostics.span.end <= source.len);
+        try testing.expectError(error.SyntaxError, result);
+        try testing.expect(diagnostics.message().len != 0);
+        try testing.expect(diagnostics.line >= 1);
+        try testing.expect(diagnostics.column >= 1);
+        try testing.expect(diagnostics.span.start <= diagnostics.span.end);
+        try testing.expect(diagnostics.span.end <= source.len);
     }
 }
 
 test "an unpaired surrogate is a string error" {
     var diagnostics: Diagnostics = undefined;
-    try std.testing.expectError(
+    try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.testing.allocator, "\"\\uD800x\"", .{
+        parseFromSlice(testing.allocator, "\"\\uD800x\"", .{
             .diagnostics = &diagnostics,
         }),
     );
-    try std.testing.expectEqual(@as(u32, 2), diagnostics.column);
+    try testing.expectEqual(@as(u32, 2), diagnostics.column);
 }
 
 test "a value nested past the limit is a diagnostic" {
     var source: [1024]u8 = undefined;
     @memset(&source, '[');
     @memset(source[257..], ']');
-    try std.testing.expectError(
+    try testing.expectError(
         error.SyntaxError,
-        parseFromSlice(std.testing.allocator, source[0..514], .{}),
+        parseFromSlice(testing.allocator, source[0..514], .{}),
     );
 }
 
 test "the writer emits minified JSON" {
-    var parsed = try parseFromSlice(std.testing.allocator, "{ a: 1, b: [true, null, 'x'], c: 1.5 }", .{});
+    const source = "{ a: 1, b: [true, null, 'x'], c: 1.5 }";
+    var parsed = try parseFromSlice(testing.allocator, source, .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{}, &output.writer);
-    try std.testing.expectEqualStrings("{\"a\":1,\"b\":[true,null,\"x\"],\"c\":1.5}", output.written());
+    try testing.expectEqualStrings("{\"a\":1,\"b\":[true,null,\"x\"],\"c\":1.5}", output.written());
 }
 
 test "the writer indents" {
-    var parsed = try parseFromSlice(std.testing.allocator, "{ a: 1, b: [true, null] }", .{});
+    var parsed = try parseFromSlice(testing.allocator, "{ a: 1, b: [true, null] }", .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{ .whitespace = .indent_2 }, &output.writer);
-    try std.testing.expectEqualStrings(
+    try testing.expectEqualStrings(
         \\{
         \\  "a": 1,
         \\  "b": [
@@ -424,26 +423,26 @@ test "the writer indents" {
 }
 
 test "the writer escapes non-ASCII on request" {
-    var parsed = try parseFromSlice(std.testing.allocator, "'é'", .{});
+    var parsed = try parseFromSlice(testing.allocator, "'é'", .{});
     defer parsed.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{ .escape_unicode = true }, &output.writer);
-    try std.testing.expectEqualStrings("\"\\u00e9\"", output.written());
+    try testing.expectEqualStrings("\"\\u00e9\"", output.written());
 }
 
 test "the writer spells a non-finite float as JSON5" {
     inline for (.{ "NaN", "Infinity", "-Infinity" }) |source| {
-        var parsed = try parseFromSlice(std.testing.allocator, source, .{});
+        var parsed = try parseFromSlice(testing.allocator, source, .{});
         defer parsed.deinit();
 
-        var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+        var output: std.Io.Writer.Allocating = .init(testing.allocator);
         defer output.deinit();
         try Stringify.value(parsed.value, .{}, &output.writer);
-        try std.testing.expectEqualStrings(source, output.written());
+        try testing.expectEqualStrings(source, output.written());
 
-        try std.testing.expectError(
+        try testing.expectError(
             error.NonFiniteFloat,
             Stringify.value(parsed.value, .{ .allow_nonfinite = false }, &output.writer),
         );
@@ -451,30 +450,30 @@ test "the writer spells a non-finite float as JSON5" {
 }
 
 test "the writer keeps an integral float a float" {
-    var parsed = try parseFromSlice(std.testing.allocator, "1.0", .{});
+    var parsed = try parseFromSlice(testing.allocator, "1.0", .{});
     defer parsed.deinit();
-    try std.testing.expect(parsed.value == .float);
+    try testing.expect(parsed.value == .float);
 
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(parsed.value, .{}, &output.writer);
-    try std.testing.expectEqualStrings("1.0", output.written());
+    try testing.expectEqualStrings("1.0", output.written());
 
-    var again = try parseFromSlice(std.testing.allocator, output.written(), .{});
+    var again = try parseFromSlice(testing.allocator, output.written(), .{});
     defer again.deinit();
-    try std.testing.expect(again.value == .float);
+    try testing.expect(again.value == .float);
 }
 
 test "the writer copies number_string bytes" {
     const value: Value = .{ .number_string = "1e999" };
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(value, .{}, &output.writer);
-    try std.testing.expectEqualStrings("1e999", output.written());
+    try testing.expectEqualStrings("1e999", output.written());
 }
 
 test "the writer stops on a tree that nests too deep" {
-    var arena: ArenaAllocator = .init(std.testing.allocator);
+    var arena: ArenaAllocator = .init(testing.allocator);
     defer arena.deinit();
     var value: Value = .null;
     for (0..257) |_| {
@@ -482,9 +481,9 @@ test "the writer stops on a tree that nests too deep" {
         try array.append(value);
         value = .{ .array = array };
     }
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
-    try std.testing.expectError(
+    try testing.expectError(
         error.NestingTooDeep,
         Stringify.value(value, .{}, &output.writer),
     );
@@ -504,16 +503,16 @@ test "a document round-trips through the writer" {
         \\    "backwardsCompatible": "with JSON",
         \\}
     ;
-    var first = try parseFromSlice(std.testing.allocator, source, .{});
+    var first = try parseFromSlice(testing.allocator, source, .{});
     defer first.deinit();
 
-    var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
+    var output: std.Io.Writer.Allocating = .init(testing.allocator);
     defer output.deinit();
     try Stringify.value(first.value, .{ .whitespace = .indent_2 }, &output.writer);
 
-    var second = try parseFromSlice(std.testing.allocator, output.written(), .{});
+    var second = try parseFromSlice(testing.allocator, output.written(), .{});
     defer second.deinit();
-    try std.testing.expect(sameValue(first.value, second.value));
+    try testing.expect(sameValue(first.value, second.value));
 }
 
 fn sameValue(a: Value, b: Value) bool {

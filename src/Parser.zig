@@ -30,6 +30,9 @@ const max_depth = 256;
 
 const line_separator_message = "U+2028 and U+2029 must be escaped in a string";
 const name_escape_message = "a name escape is `\\u` and four hexadecimal digits";
+const string_line_message = "a string cannot span lines without a backslash";
+const string_end_message = "the string does not end";
+const surrogate_pair_message = "a high surrogate needs a low surrogate after it";
 
 source: []const u8,
 index: usize = 0,
@@ -76,7 +79,12 @@ pub fn parse(self: *Parser) Error!Value {
     const value = try self.parseValue();
     try self.skipWhitespace();
     if (!self.atEnd()) {
-        return self.failAt(self.index, self.index + 1, "unexpected bytes after the top-level value", .{});
+        return self.failAt(
+            self.index,
+            self.index + 1,
+            "unexpected bytes after the top-level value",
+            .{},
+        );
     }
     return value;
 }
@@ -86,7 +94,12 @@ pub fn parse(self: *Parser) Error!Value {
 fn parseValue(self: *Parser) Error!Value {
     try self.skipWhitespace();
     if (self.atEnd()) {
-        return self.failAt(self.index, self.index, "expected a value, found the end of the source", .{});
+        return self.failAt(
+            self.index,
+            self.index,
+            "expected a value, found the end of the source",
+            .{},
+        );
     }
     return switch (self.source[self.index]) {
         '{' => self.parseObject(),
@@ -108,7 +121,12 @@ fn parseKeyword(self: *Parser, comptime word: []const u8, value: Value) Error!Va
     if (!self.atEnd()) {
         const next = self.source[self.index];
         if (next >= 0x80 or isNameByte(next, false)) {
-            return self.failAt(self.index - word.len, self.index + 1, "`{s}` is followed by a name character", .{word});
+            return self.failAt(
+                self.index - word.len,
+                self.index + 1,
+                "`{s}` is followed by a name character",
+                .{word},
+            );
         }
     }
     return value;
@@ -165,7 +183,12 @@ fn parseArray(self: *Parser) Error!Value {
 fn parseMemberName(self: *Parser) Error![]const u8 {
     try self.skipWhitespace();
     if (self.atEnd()) {
-        return self.failAt(self.index, self.index, "expected a name, found the end of the source", .{});
+        return self.failAt(
+            self.index,
+            self.index,
+            "expected a name, found the end of the source",
+            .{},
+        );
     }
     return switch (self.source[self.index]) {
         '"', '\'' => self.parseString(),
@@ -190,7 +213,7 @@ fn parseString(self: *Parser) Error![]const u8 {
             return self.parseEscapedString(quote, start);
         }
         if (c == '\n' or c == '\r') {
-            return self.failAt(i, i + 1, "a string cannot span lines without a backslash", .{});
+            return self.failAt(i, i + 1, string_line_message, .{});
         }
         if (c < 0x80) {
             i += 1;
@@ -202,7 +225,7 @@ fn parseString(self: *Parser) Error![]const u8 {
         }
         i += sequence.len;
     }
-    return self.failAt(start - 1, self.source.len, "the string does not end", .{});
+    return self.failAt(start - 1, self.source.len, string_end_message, .{});
 }
 
 fn parseEscapedString(self: *Parser, quote: u8, start: usize) Error![]const u8 {
@@ -220,7 +243,7 @@ fn parseEscapedString(self: *Parser, quote: u8, start: usize) Error![]const u8 {
             continue;
         }
         if (c == '\n' or c == '\r') {
-            return self.failAt(self.index, self.index + 1, "a string cannot span lines without a backslash", .{});
+            return self.failAt(self.index, self.index + 1, string_line_message, .{});
         }
         if (c < 0x80) {
             try out.append(self.allocator, c);
@@ -234,13 +257,13 @@ fn parseEscapedString(self: *Parser, quote: u8, start: usize) Error![]const u8 {
         try out.appendSlice(self.allocator, self.source[self.index..][0..sequence.len]);
         self.index += sequence.len;
     }
-    return self.failAt(start - 1, self.source.len, "the string does not end", .{});
+    return self.failAt(start - 1, self.source.len, string_end_message, .{});
 }
 
 fn appendEscape(self: *Parser, out: *ArrayList(u8)) Error!void {
     const backslash = self.index;
     self.index += 1;
-    if (self.atEnd()) return self.failAt(backslash, self.source.len, "the string does not end", .{});
+    if (self.atEnd()) return self.failAt(backslash, self.source.len, string_end_message, .{});
     const c = self.source[self.index];
     self.index += 1;
     switch (c) {
@@ -253,12 +276,25 @@ fn appendEscape(self: *Parser, out: *ArrayList(u8)) Error!void {
         'v' => try out.append(self.allocator, 0x0B),
         '0' => {
             if (!self.atEnd() and std.ascii.isDigit(self.source[self.index])) {
-                return self.failAt(backslash, self.index + 1, "`\\0` cannot be followed by a digit", .{});
+                return self.failAt(
+                    backslash,
+                    self.index + 1,
+                    "`\\0` cannot be followed by a digit",
+                    .{},
+                );
             }
             try out.append(self.allocator, 0);
         },
-        '1'...'9' => return self.failAt(backslash, self.index, "`\\{c}` is not a JSON5 escape", .{c}),
-        'x' => try self.appendCodepoint(out, try self.readHex(backslash, 2, "`\\x` needs two hexadecimal digits")),
+        '1'...'9' => return self.failAt(
+            backslash,
+            self.index,
+            "`\\{c}` is not a JSON5 escape",
+            .{c},
+        ),
+        'x' => {
+            const cp = try self.readHex(backslash, 2, "`\\x` needs two hexadecimal digits");
+            try self.appendCodepoint(out, cp);
+        },
         'u' => try self.appendCodepoint(out, try self.readUnicodeEscape(backslash)),
         '\n' => {},
         '\r' => if (!self.atEnd() and self.source[self.index] == '\n') {
@@ -283,24 +319,34 @@ fn appendEscape(self: *Parser, out: *ArrayList(u8)) Error!void {
 fn readUnicodeEscape(self: *Parser, backslash: usize) Error!u21 {
     const cp = try self.readHex(backslash, 4, "`\\u` needs four hexadecimal digits");
     if (cp >= 0xDC00 and cp <= 0xDFFF) {
-        return self.failAt(backslash, self.index, "a low surrogate needs a high surrogate before it", .{});
+        return self.failAt(
+            backslash,
+            self.index,
+            "a low surrogate needs a high surrogate before it",
+            .{},
+        );
     }
     if (cp < 0xD800 or cp > 0xDBFF) return cp;
     if (self.index + 6 > self.source.len or
         self.source[self.index] != '\\' or self.source[self.index + 1] != 'u')
     {
-        return self.failAt(backslash, self.index, "a high surrogate needs a low surrogate after it", .{});
+        return self.failAt(backslash, self.index, surrogate_pair_message, .{});
     }
     const low_start = self.index;
     self.index += 2;
     const low = try self.readHex(backslash, 4, "`\\u` needs four hexadecimal digits");
     if (low < 0xDC00 or low > 0xDFFF) {
-        return self.failAt(low_start, self.index, "a high surrogate needs a low surrogate after it", .{});
+        return self.failAt(low_start, self.index, surrogate_pair_message, .{});
     }
     return 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
 }
 
-fn readHex(self: *Parser, backslash: usize, comptime count: u8, comptime message: []const u8) Error!u21 {
+fn readHex(
+    self: *Parser,
+    backslash: usize,
+    comptime count: u8,
+    comptime message: []const u8,
+) Error!u21 {
     var value: u21 = 0;
     var i: u8 = 0;
     while (i < count) : (i += 1) {
@@ -478,7 +524,8 @@ fn parseHex(self: *Parser, start: usize, negative: bool) Error!Value {
     if (overflow) {
         var value: f64 = 0;
         for (self.source[digits..self.index]) |c| {
-            value = value * 16 + @as(f64, @floatFromInt(std.fmt.charToDigit(c, 16) catch unreachable));
+            const digit = std.fmt.charToDigit(c, 16) catch unreachable;
+            value = value * 16 + @as(f64, @floatFromInt(digit));
         }
         return .{ .float = if (negative) -value else value };
     }
@@ -497,7 +544,12 @@ fn parseDecimal(self: *Parser, start: usize) Error!Value {
         self.index += 1;
         digits = 1;
         if (!self.atEnd() and std.ascii.isDigit(self.source[self.index])) {
-            return self.failAt(start, self.index + 1, "a decimal number cannot have a leading zero", .{});
+            return self.failAt(
+                start,
+                self.index + 1,
+                "a decimal number cannot have a leading zero",
+                .{},
+            );
         }
     } else if (self.source[self.index] >= '1' and self.source[self.index] <= '9') {
         while (!self.atEnd() and std.ascii.isDigit(self.source[self.index])) self.index += 1;
@@ -642,7 +694,12 @@ fn decodeSequence(bytes: [4]u8, len: u8) ?u21 {
 fn enter(self: *Parser) Error!void {
     self.depth += 1;
     if (self.depth > max_depth) {
-        return self.failAt(self.index, self.index + 1, "the value nests deeper than {d} levels", .{max_depth});
+        return self.failAt(
+            self.index,
+            self.index + 1,
+            "the value nests deeper than {d} levels",
+            .{max_depth},
+        );
     }
 }
 
