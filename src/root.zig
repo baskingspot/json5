@@ -52,6 +52,11 @@ pub const ParseOptions = struct {
 /// A parsed value and the memory that holds it.
 pub const Parsed = struct {
     /// The arena that owns every string, object, and array in `value`.
+    ///
+    /// It is heap-allocated on purpose. `std.json.Array` is a managed list
+    /// that carries the allocator it was built with, and that allocator's
+    /// pointer is this arena. A value field would move with `Parsed`, and
+    /// every array in the tree would point at a dead stack slot.
     arena: *ArenaAllocator,
     /// The root value.
     value: Value,
@@ -90,7 +95,9 @@ pub fn parseFromSlice(
 /// Use this when the caller has an arena whose lifetime is known, such as a
 /// request or a configuration load. The returned value owns nothing, and
 /// freeing it is the caller's problem. The source is still copied, so it may
-/// be freed as soon as this returns.
+/// be freed as soon as this returns. The arena must stay at the same address
+/// while the tree lives, because every array in the tree holds the allocator
+/// built from it.
 pub fn parseFromSliceLeaky(
     allocator: Allocator,
     source: []const u8,
@@ -154,6 +161,16 @@ test "a repeated name keeps the last value" {
     const root = parsed.value.object;
     try testing.expectEqual(@as(i64, 2), root.get("a").?.integer);
     try testing.expectEqual(@as(usize, 2), root.count());
+}
+
+test "a parsed array can grow in its arena" {
+    var parsed = try parseFromSlice(testing.allocator, "[1]", .{});
+    defer parsed.deinit();
+    // Appending goes back through the arena the tree was built with, and
+    // `Parsed.deinit` frees what it allocates.
+    try parsed.value.array.append(.{ .integer = 2 });
+    try testing.expectEqual(@as(usize, 2), parsed.value.array.items.len);
+    try testing.expectEqual(@as(i64, 2), parsed.value.array.items[1].integer);
 }
 
 test "the tree does not borrow the source" {
