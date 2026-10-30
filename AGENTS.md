@@ -4,11 +4,13 @@ Working notes for AI coding agents in baskingspot/json5.
 
 ## What this is
 
-JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments. It is incubating: unstable, with no promises about its API.
+JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments. It has no tagged release: the API can move until the first tag.
 
 ## Environment
 
 Zig 0.16 only. The flake is the tool contract, from `baskingspot/nix`: `nix develop` provides Zig, `ziglint`, and the base tools, and nothing comes from the system PATH. The justfile is the command interface: `just test`, `just lint`, `just ci`. Run `just fmt` before you commit.
+
+The guide is `docs/content/_index.md` on the baskingspot docs theme. `just doc` builds the site into `zig-out/site/json5/`, `just guide` serves it with live reload, and the API reference comes from docgen over `src/root.zig`. The guide's code blocks are files in `docs/examples/`, embedded with `load_data` and compiled by `just test`, so a block in the guide cannot drift from code that builds. Add an example there, not inline.
 
 The conformance corpus in `test/json5-tests/` is vendored from
 `json5/json5-tests` and must not be edited to make a test pass;

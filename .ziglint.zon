@@ -6,6 +6,7 @@
         "src/root.zig",
         "src/Diagnostics.zig",
         "src/Parser.zig",
+        "docs/examples",
         "test/corpus.zig",
     },
     .rules = .{

@@ -44,4 +44,18 @@ pub fn build(b: *std.Build) void {
     run_corpus_tests.addArg(b.fmt("--seed=0x{x}", .{b.graph.random_seed}));
     run_corpus_tests.setCwd(b.path("."));
     test_step.dependOn(&run_corpus_tests.step);
+
+    // The guide's examples are real programs against the public module,
+    // tested with everything else so a guide page cannot show code that does
+    // not build.
+    const examples_mod = b.createModule(.{
+        .root_source_file = b.path("docs/examples/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "json5", .module = mod }},
+    });
+    const example_tests = b.addTest(.{ .root_module = examples_mod, .test_runner = test_runner });
+    const run_example_tests = b.addRunArtifact(example_tests);
+    run_example_tests.addArg(b.fmt("--seed=0x{x}", .{b.graph.random_seed}));
+    test_step.dependOn(&run_example_tests.step);
 }

@@ -5,7 +5,7 @@
 default:
     @just --list
 
-[doc("Unit tests: the module and the json5-tests corpus, one line per test binary via testingx")]
+[doc("Unit tests: the module, the json5-tests corpus, and the guide's examples, one line per test binary via testingx")]
 [group("test")]
 test:
     zig build test --summary all
@@ -14,9 +14,9 @@ test:
 [group("lint")]
 lint:
     ziglint
-    zig fmt --check src test/corpus.zig build.zig build.zig.zon
+    zig fmt --check src docs/examples test/corpus.zig build.zig build.zig.zon
     nix fmt -- --ci
-    oxfmt --check README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md docs/content .github .oxfmtrc.jsonc
+    oxfmt --check README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md docs/content docs/config.toml .github .oxfmtrc.jsonc
     actionlint
     zizmor .
     just --fmt --check
@@ -24,11 +24,32 @@ lint:
 [doc("Format everything lint checks")]
 [group("lint")]
 fmt:
-    zig fmt src test/corpus.zig build.zig build.zig.zon
+    zig fmt src docs/examples test/corpus.zig build.zig build.zig.zon
     nix fmt
-    oxfmt README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md docs/content .github .oxfmtrc.jsonc
+    oxfmt README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md docs/content docs/config.toml .github .oxfmtrc.jsonc
     just --fmt
 
-[doc("Everything CI runs: the tests and lint")]
+[doc("Everything CI runs: the tests, lint, and the site build")]
 [group("ci")]
-ci: test lint
+ci: test lint doc
+
+[doc("Build the site into zig-out/site/json5/: the guide (Zola, from docs/) and the API reference (docgen JSON, rendered by the theme's api.html) under api/. The router in baskingspot/site serves /json5/... from it")]
+[group("docs")]
+doc: api
+    baskingspot-docs build json5
+
+[doc("Edit the guide with live reload (http://127.0.0.1:1111), API reference included")]
+[group("docs")]
+guide: api
+    baskingspot-docs serve json5
+
+# The API reference data. docgen comes from the baskingspot flake's docs shell,
+# so this is not a Zig build dependency.
+[private]
+api:
+    docgen --root src/root.zig --title json5 --repo-url https://github.com/baskingspot/json5 --rev main --format json --out docs/data
+
+[doc("Deploy the rendered docs to Cloudflare as an assets-only Worker (config in wrangler.jsonc). Needs CLOUDFLARE_API_TOKEN in the environment, plus CLOUDFLARE_ACCOUNT_ID if the token can see more than one account")]
+[group("docs")]
+doc-deploy: doc
+    wrangler deploy

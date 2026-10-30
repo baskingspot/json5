@@ -6,9 +6,13 @@ JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments.
 
 Zig has no JSON5 parser in std. This one reads a JSON5 document into the
 `std.json.Value` tree you already walk, so a tree moves between this parser and
-`std.json` without a conversion. `parseFromSlice` takes a destination type when
-you want one, and `Stringify.value` writes the tree, or any type `std.json`
-knows, back as strict JSON.
+`std.json` without a conversion. Pass a type to `parseFromSlice` when you want
+one, and `Stringify.value` writes the tree or any type `std.json` knows back as
+strict JSON.
+
+It reads the syntax JSON leaves out: `//` and `/* */` comments, a trailing
+comma, single-quoted and multi-line strings, unquoted names, `0x` numbers, a
+leading `+`, a leading or trailing decimal point, `NaN`, and `Infinity`.
 
 - [Reading a value](#reading-a-value): `parseFromSlice(std.json.Value, ...)` returns a `Parsed`, and `Diagnostics` gives the span, line, and message of the first syntax error.
 - [Typed reading](#typed-reading): pass a struct, union, enum, or slice as the first argument, and `std.json.parseFromValue` builds it. `ParseOptions.json` holds std's options.
@@ -17,7 +21,7 @@ knows, back as strict JSON.
 - [Conformance](#conformance): 114 cases from `json5-tests`, run by `just test`.
 - [Limits](#limits): a parser that wants the whole source and a writer that normalizes the document.
 
-The doc comments in `src/` state the contract for every public symbol.
+The [API reference](api/) documents every public symbol.
 
 # Getting started
 
@@ -46,18 +50,16 @@ const json5 = @import("json5");
 
 ## Read the examples
 
-The tests in `src/` use every symbol this page names, and `just test` runs them
-with the corpus.
+The examples this page embeds are in `docs/examples/`. `just test` compiles and
+runs them with the module's own tests and the corpus, so no example can show
+code that does not build.
 
 # Reading a value
 
 ## Parse one document
 
 ```zig
-const document = try json5.parseFromSlice(std.json.Value, gpa, source, .{});
-defer document.deinit();
-
-const root = document.value;
+{{ load_data(path="examples/read_value.zig", format="plain") | trim_end }}
 ```
 
 `parseFromSlice` copies every string, object, and array into an arena that the
@@ -69,10 +71,7 @@ A document that breaks the grammar is `error.SyntaxError`. Pass a
 first error:
 
 ```zig
-var diagnostics: json5.Diagnostics = undefined;
-const document = try json5.parseFromSlice(std.json.Value, gpa, source, .{
-    .diagnostics = &diagnostics,
-});
+{{ load_data(path="examples/diagnostics.zig", format="plain") | trim_end }}
 ```
 
 The diagnostics are untouched when the parse succeeds and on
@@ -84,32 +83,21 @@ The diagnostics are untouched when the parse succeeds and on
 `.bool`, `.integer`, `.float`, `.string`, `.array`, and `.object`. An object
 is a `std.json.ObjectMap` and an array is a `std.json.Array`.
 
-```zig
-const name = document.value.object.get("name") orelse return error.NoName;
-std.debug.print("{s}\n", .{name.string});
-```
-
 Member order is document order. A repeated name keeps its first position and
 its last value, which is what a JavaScript object does.
 
 A number literal with no fraction and no exponent is `.integer` when it fits
-`i64`. Every other number is `.float`, including a hexadecimal value past
+`i64`; every other number is `.float`, including a hexadecimal value past
 `i64` and `-0`. `.number_string` is never set.
 
 # Typed reading
 
 ## Parse into a struct
 
-The first argument is the destination type:
+The first argument is the destination type.
 
 ```zig
-const Config = struct {
-    name: []const u8,
-    retry: ?u32 = null,
-};
-
-var config = try json5.parseFromSlice(Config, gpa, source, .{});
-defer config.deinit();
+{{ load_data(path="examples/typed_config.zig", format="plain") | trim_end }}
 ```
 
 The parser builds a `std.json.Value` tree, then `std.json.parseFromValue`
@@ -118,23 +106,17 @@ tagged union, an enum, an optional, a slice, or a type with its own
 `jsonParseFromValue`. When `T` is `std.json.Value`, the second pass is
 skipped.
 
-`ParseOptions.json` is a `std.json.ParseOptions`, used for the second pass:
-
-```zig
-var config = try json5.parseFromSlice(Config, gpa, source, .{
-    .json = .{ .ignore_unknown_fields = true },
-});
-```
-
-The defaults are std's: an unknown field is `error.UnknownField`, a repeated
+`ParseOptions.json` is a `std.json.ParseOptions`, used for the second pass.
+The defaults are std's. An unknown field is `error.UnknownField`, a repeated
 field is `error.DuplicateField`, and a field with a default value may be
 missing.
 
 ## What std.json accepts
 
-The mapping is std's `parseFromValue`: struct fields by name, tagged unions as
-an object with the tag as its key, enums by tag name or integer, optionals as
-`null` or the payload, and slices as arrays. A type that declares
+The mapping is std's `parseFromValue`. Struct fields go by name, a tagged
+union is an object with the tag as its key, an enum is its tag name or
+integer, an optional is `null` or the payload, and a slice is an array. A type
+that declares
 
 ```zig
 pub fn jsonParseFromValue(
@@ -147,18 +129,16 @@ pub fn jsonParseFromValue(
 is decoded by that method instead.
 
 `parseFromSliceLeaky(T, arena.allocator(), source, .{})` is the same parse
-into an arena the caller owns. The arena must stay at the same address while the value
-lives, because a `std.json.Value` tree's arrays hold the allocator built from
-it.
+into an arena the caller owns. The arena must stay at the same address while
+the value lives, because a `std.json.Value` tree's arrays hold the allocator
+built from it.
 
 # Writing
 
 ## Write a value
 
 ```zig
-var output: std.Io.Writer.Allocating = .init(gpa);
-defer output.deinit();
-try json5.Stringify.value(document.value, .{ .whitespace = .indent_2 }, &output.writer);
+{{ load_data(path="examples/write_json.zig", format="plain") | trim_end }}
 ```
 
 `Stringify.value` takes the types `std.json.Stringify.value` takes: null,
@@ -180,14 +160,7 @@ non-finite value are the two places the output differs from `std.json`.
 ## The jsonStringify protocol
 
 ```zig
-const Release = struct {
-    major: u16,
-    minor: u16,
-
-    pub fn jsonStringify(self: Release, jws: anytype) !void {
-        try jws.print("\"{d}.{d}\"", .{ self.major, self.minor });
-    }
-};
+{{ load_data(path="examples/write_protocol.zig", format="plain") | trim_end }}
 ```
 
 The writer's methods are `beginObject`, `endObject`, `objectField`,
@@ -207,10 +180,10 @@ costs.
 
 ## Escapes
 
-A `\uXXXX` in a name is decoded before the name rule is applied. A high surrogate
-must be followed by a low surrogate, and the pair decodes to one code point,
-so `\uD801\uDC00` is U+10400 and can start a name. A lone surrogate is a
-syntax error.
+A `\uXXXX` in a name is decoded before the name rule is applied. A high
+surrogate must be followed by a low surrogate, and the pair decodes to one
+code point, so `\uD801\uDC00` is U+10400 and can start a name. A lone
+surrogate is a syntax error.
 
 # Conformance
 

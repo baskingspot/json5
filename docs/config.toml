@@ -1,0 +1,24 @@
+# The json5 guide, served at baskingspot.dev/json5/. The theme and the site
+# build come from baskingspot-docs; the router in baskingspot/site serves
+# /json5/...
+base_url = "https://baskingspot.dev/json5"
+theme = "baskingspot"
+title = "json5"
+description = "JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments."
+
+generate_feeds = false
+build_search_index = false
+
+[markdown]
+insert_anchor_links = "heading"
+
+[markdown.highlighting]
+# An unknown fence language is a build error, not an unhighlighted block.
+error_on_missing_language = true
+light_theme = "github-light"
+dark_theme = "github-dark"
+
+[extra]
+repo = "baskingspot/json5"
+api = true
+third_party = true
