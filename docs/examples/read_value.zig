@@ -12,7 +12,7 @@ const source =
 ;
 
 test "parse a document into the std.json tree" {
-    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .init);
+    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .{});
     defer document.deinit();
 
     const root = document.value.object;
@@ -30,7 +30,7 @@ test "a repeated name keeps its first position and its last value" {
         std.json.Value,
         std.testing.allocator,
         "{ a: 1, b: 2, a: 3 }",
-        .init,
+        .{},
     );
     defer document.deinit();
 

@@ -13,7 +13,7 @@ const Release = struct {
 test "a type with jsonStringify decides its own form" {
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
     defer output.deinit();
-    try json5.Stringify.value(Release{ .major = 0, .minor = 2 }, .init, &output.writer);
+    try json5.Stringify.value(Release{ .major = 0, .minor = 2 }, .{}, &output.writer);
 
     try std.testing.expectEqualStrings("\"0.2\"", output.written());
 }

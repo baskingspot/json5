@@ -112,7 +112,7 @@ test "every .json5 case parses and survives the writer" {
         };
 
         var output: std.Io.Writer.Allocating = .init(allocator);
-        json5.Stringify.value(first, .init, &output.writer) catch |err| {
+        json5.Stringify.value(first, .{}, &output.writer) catch |err| {
             try report(case.path, "writing it failed: {s}", .{@errorName(err)});
             failures += 1;
             if (failures == max_failures) break;

@@ -9,7 +9,7 @@ test "write the tree as strict JSON" {
         \\}
     ;
 
-    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .init);
+    var document = try json5.parseFromSlice(std.json.Value, std.testing.allocator, source, .{});
     defer document.deinit();
 
     var output: std.Io.Writer.Allocating = .init(std.testing.allocator);
