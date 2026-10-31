@@ -595,7 +595,6 @@ fn stringValue(self: *Stringify, s: []const u8) !void {
 }
 
 // ast-grep-ignore: public-struct-field-default -- options bag: call sites override one knob
-// ast-grep-ignore: public-struct-field-default -- options bag: call sites override one knob
 pub const Options = struct {
     /// false makes `NaN` and `Infinity` fail instead of being written as the
     /// JSON5 spelling.
