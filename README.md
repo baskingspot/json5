@@ -54,7 +54,7 @@ const json5 = b.dependency("json5", .{ .target = target, .optimize = optimize })
 exe.root_module.addImport("json5", json5.module("json5"));
 ```
 
-`std.json` keeps its name, so `json5` can sit beside it in the same file. `json5` builds with Zig 0.16 only.
+`std.json` keeps its name, so `json5` can sit beside it in the same file. `json5` builds with Zig 0.16 and 0.17.
 
 ## Documentation
 

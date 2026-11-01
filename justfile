@@ -13,7 +13,7 @@ test:
 [doc("Lint Zig, Nix, Markdown, the workflows, and this justfile: ziglint, the ast-grep rules, zig fmt, nix fmt, oxfmt, actionlint, zizmor, and just --fmt")]
 [group("lint")]
 lint:
-    ziglint
+    ziglint-0-16
     baskingspot-lint src
     zig fmt --check src docs/examples test/corpus.zig build.zig build.zig.zon
     nix fmt -- --ci
@@ -30,9 +30,13 @@ fmt:
     oxfmt README.md AGENTS.md CHANGELOG.md THIRD_PARTY.md docs/content docs/config.toml .github .oxfmtrc.jsonc
     just --fmt
 
-[doc("Everything CI runs: the tests, lint, and the site build")]
+[doc("The per-version gate: the module, the corpus, and the guide's examples")]
 [group("ci")]
-ci: test lint doc
+check: test
+
+[doc("Everything CI runs: the gate, lint, and the docs build")]
+[group("ci")]
+ci: check lint doc
 
 [doc("Build the site into zig-out/site/json5/: the guide (Zola, from docs/) and the API reference (docgen JSON, rendered by the theme's api.html) under api/. The router in baskingspot/site serves /json5/... from it")]
 [group("docs")]

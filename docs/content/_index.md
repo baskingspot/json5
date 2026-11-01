@@ -38,7 +38,7 @@ const json5 = b.dependency("json5", .{ .target = target, .optimize = optimize })
 exe.root_module.addImport("json5", json5.module("json5"));
 ```
 
-`json5` builds with Zig 0.16 only.
+`json5` builds with Zig 0.16 and 0.17.
 
 ## Import it
 

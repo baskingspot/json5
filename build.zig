@@ -28,7 +28,6 @@ pub fn build(b: *std.Build) void {
 
     const mod_tests = b.addTest(.{ .root_module = mod, .test_runner = test_runner });
     const run_mod_tests = b.addRunArtifact(mod_tests);
-    run_mod_tests.addArg(b.fmt("--seed=0x{x}", .{b.graph.random_seed}));
     test_step.dependOn(&run_mod_tests.step);
 
     // The corpus tests read `test/json5-tests` at run time, so the runner's
@@ -41,7 +40,6 @@ pub fn build(b: *std.Build) void {
     });
     const corpus_tests = b.addTest(.{ .root_module = corpus_mod, .test_runner = test_runner });
     const run_corpus_tests = b.addRunArtifact(corpus_tests);
-    run_corpus_tests.addArg(b.fmt("--seed=0x{x}", .{b.graph.random_seed}));
     run_corpus_tests.setCwd(b.path("."));
     test_step.dependOn(&run_corpus_tests.step);
 
@@ -56,6 +54,5 @@ pub fn build(b: *std.Build) void {
     });
     const example_tests = b.addTest(.{ .root_module = examples_mod, .test_runner = test_runner });
     const run_example_tests = b.addRunArtifact(example_tests);
-    run_example_tests.addArg(b.fmt("--seed=0x{x}", .{b.graph.random_seed}));
     test_step.dependOn(&run_example_tests.step);
 }

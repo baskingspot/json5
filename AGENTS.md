@@ -8,7 +8,7 @@ JSON5 in Zig: unquoted keys, single quotes, hex numbers, NaN, and comments. It h
 
 ## Environment
 
-Zig 0.16 only. The flake is the tool contract, from `baskingspot/nix`: `nix develop` provides Zig, `ziglint`, and the base tools, and nothing comes from the system PATH. The justfile is the command interface: `just test`, `just lint`, `just ci`. Run `just fmt` before you commit.
+Zig 0.16 and 0.17. The flake is the tool contract, from `baskingspot/nix`: `nix develop` is the current stable, Zig 0.17, and `nix develop .#zig-old` is Zig 0.16. Both provide `ziglint` and the base tools, and nothing comes from the system PATH. The justfile is the command interface: `just test`, `just check`, `just lint`, `just ci`. CI runs `just ci` on the default shell and `just check` on `zig-old`. Run `just fmt` before you commit.
 
 The guide is `docs/content/_index.md` on the baskingspot docs theme. `just doc` builds the site into `zig-out/site/json5/`, `just guide` serves it with live reload, and the API reference comes from docgen over `src/root.zig`. The guide's code blocks are files in `docs/examples/`, embedded with `load_data` and compiled by `just test`, so a block in the guide cannot drift from code that builds. Add an example there, not inline.
 
@@ -20,8 +20,14 @@ The conformance corpus in `test/json5-tests/` is vendored from
 exempt from ziglint; `THIRD_PARTY.md` records the changes and `LICENSE-ZIG`
 carries the terms.
 
+Version shims live in `src/compat.zig`. Do not write `@intFromEnum`,
+`@enumFromInt`, or `**` outside it: 0.17's `zig fmt` migrates the first two,
+and 0.17 removed the third. The `// zig fmt: off` block is what keeps a 0.17
+format from breaking the 0.16 build.
+
 ## Rules
 
+- Lint with `ziglint-0-16`, not `ziglint`: the wrapper points ziglint at the 0.16 std, so 0.17-only deprecations do not fire while 0.16 is supported.
 - Commit messages are one line, `area: summary`, and every commit is signed. Do not rewrite pushed history.
 - Gate commands on their exit codes, and claim only what you ran.
 - Format with `zig fmt` and lint with `ziglint`. `just fmt` and `just lint` run both.
