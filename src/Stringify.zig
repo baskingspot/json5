@@ -33,7 +33,6 @@ const testing = std.testing;
 const Io = std.Io;
 const Stringify = @This();
 const Writer = Io.Writer;
-const compat = @import("compat.zig");
 
 /// How deep containers may nest. A deeper value is `error.NestingTooDeep`.
 const max_depth: u32 = 256;
@@ -165,7 +164,7 @@ fn enter(self: *Stringify) Error!void {
 fn pushIndentation(self: *Stringify, mode: IndentationMode) !void {
     switch (safety_checks) {
         .checked_to_fixed_depth => {
-            BitStack.pushWithStateAssumeCapacity(&self.nesting_stack, &self.indent_level, compat.enumToInt(mode));
+            BitStack.pushWithStateAssumeCapacity(&self.nesting_stack, &self.indent_level, @backingInt(mode));
         },
         .assumed_correct => {
             self.indent_level += 1;
@@ -175,7 +174,7 @@ fn pushIndentation(self: *Stringify, mode: IndentationMode) !void {
 fn popIndentation(self: *Stringify, expected_mode: IndentationMode) void {
     switch (safety_checks) {
         .checked_to_fixed_depth => {
-            assert(BitStack.popWithState(&self.nesting_stack, &self.indent_level) == compat.enumToInt(expected_mode));
+            assert(BitStack.popWithState(&self.nesting_stack, &self.indent_level) == @backingInt(expected_mode));
         },
         .assumed_correct => {
             self.indent_level -= 1;
@@ -240,7 +239,7 @@ fn valueDone(self: *Stringify) void {
 fn isObjectKeyExpected(self: *const Stringify) ?bool {
     switch (safety_checks) {
         .checked_to_fixed_depth => return self.indent_level > 0 and
-            BitStack.peekWithState(&self.nesting_stack, self.indent_level) == compat.enumToInt(IndentationMode.object) and
+            BitStack.peekWithState(&self.nesting_stack, self.indent_level) == @backingInt(IndentationMode.object) and
             self.next_punctuation != .colon,
         .assumed_correct => return null,
     }
@@ -446,15 +445,13 @@ pub fn write(self: *Stringify, v: anytype) Error!void {
                 return v.jsonStringify(self);
             }
 
-            if (!compat.enumIsExhaustive(enum_info)) {
-                const field_count = comptime compat.fieldCount(enum_info);
-                inline for (0..field_count) |i| {
-                    const name = comptime compat.fieldName(enum_info, i);
+            if (enum_info.mode == .nonexhaustive) {
+                inline for (enum_info.field_names) |name| {
                     if (v == @field(T, name)) {
                         break;
                     }
                 } else {
-                    return self.write(compat.enumToInt(v));
+                    return self.write(@backingInt(v));
                 }
             }
 
@@ -471,10 +468,7 @@ pub fn write(self: *Stringify, v: anytype) Error!void {
             const info = @typeInfo(T).@"union";
             if (info.tag_type) |UnionTagType| {
                 try self.beginObject();
-                const field_count = comptime compat.fieldCount(info);
-                inline for (0..field_count) |i| {
-                    const name = comptime compat.fieldName(info, i);
-                    const FieldType = comptime compat.fieldType(info, i);
+                inline for (info.field_names, info.field_types) |name, FieldType| {
                     if (v == @field(UnionTagType, name)) {
                         try self.objectField(name);
                         if (FieldType == void) {
@@ -505,10 +499,7 @@ pub fn write(self: *Stringify, v: anytype) Error!void {
             } else {
                 try self.beginObject();
             }
-            const field_count = comptime compat.fieldCount(S);
-            inline for (0..field_count) |i| {
-                const name = comptime compat.fieldName(S, i);
-                const FieldType = comptime compat.fieldType(S, i);
+            inline for (S.field_names, S.field_types) |name, FieldType| {
                 // don't include void fields
                 if (FieldType == void) continue;
 
@@ -931,7 +922,7 @@ test "stringify non-exhaustive enum" {
         _,
     };
     try testStringify("\"foo\"", E.foo, .{});
-    try testStringify("1", compat.enumFromInt(E, 1), .{});
+    try testStringify("1", @as(E, @fromBackingInt(@intCast(1))), .{});
 }
 
 test "stringify enum literals" {
