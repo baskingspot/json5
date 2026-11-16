@@ -5,6 +5,8 @@ All notable changes to json5 are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-16
+
 ### Changed
 
 - `json5` builds with Zig 0.17 only. `minimum_zig_version` is `0.17.0`, and a
