@@ -22,7 +22,7 @@ const document = try json5.parseFromSlice(std.json.Value, gpa, source, .init);
 defer document.deinit();
 ```
 
-The API is pre-1.0: pin the commit, and expect it to move.
+The API is pre-1.0: pin a version, and expect it to move.
 
 ## What is in it
 
